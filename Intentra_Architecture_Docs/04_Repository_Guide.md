@@ -39,7 +39,7 @@ intentra-monorepo/
 The root README is for **onboarding new developers**. It must contain:
 1.  **Project Overview:** "Intentra is an AI-native transaction assurance platform..."
 2.  **Architecture Diagram:** Embed the system sequence diagram.
-3.  **Quickstart Guide:** The single command needed to spin up the entire stack locally (e.g., `docker-compose up -d` followed by `npm run dev` and `uvicorn run`).
+3.  **Quickstart Guide:** The single command needed to spin up the entire stack locally (e.g., `docker-compose up -d` followed by `bun dev` and `uvicorn run`).
 4.  **Environment Variables:** A template of required API keys (Privy, World ID, Arc, Moove, Bazantic).
 
 ### `frontend/README.md`
