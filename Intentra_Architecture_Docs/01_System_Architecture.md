@@ -82,8 +82,6 @@ sequenceDiagram
     NextJS->>FastAPI: Submit Signature
     FastAPI->>Arc: Lock Funds in Escrow
     Arc-->>FastAPI: Transaction Hash
-    FastAPI->>Moove: Generate Payment Link
-    Moove-->>FastAPI: moove_link_id
     FastAPI-->>NextJS: Transaction Authorized & Pending
 ```
 
@@ -110,7 +108,7 @@ Here is exactly where each partner fits into the architecture, and how easily th
 
 | **World ID** | **Frontend**: Widget for users to prove humanness.<br>**Backend (`IdentityService`)**: Verifies the zero-knowledge proof before onboarding or high-risk actions. | **Excellent**. World ID uses standard REST APIs to verify the cryptographic proofs. Easy to call via Python's `httpx` or `requests`. |
 | **The Graph** | **Backend (`TrustService` & `EvidenceService`)**: Queries decentralized subgraphs to fetch a provider's historical on-chain fulfillment records. | **Excellent**. The Graph uses standard GraphQL. We can query it easily using Python's `gql` or standard `httpx` POST requests. |
-| **Moove** | **Backend (`PaymentService`)**: Generates fiat payment links and listens for webhooks when the user pays the Lagos painter in Naira. | **Excellent**. Moove operates via standard REST APIs and Webhooks. |
+| **Moove (Post-Hackathon)** | **Backend (`PaymentService`)**: Generates fiat payment links and listens for webhooks when the user pays the Lagos painter in Naira. | **Excellent**. Moove operates via standard REST APIs and Webhooks. |
 | **Arc** | **Backend (`PaymentService`)**: Executes USDC transfers if the transaction is crypto-native. | **Excellent**. We will use the officially recognized `web3.py` directly within our FastAPI backend to execute raw cryptographic transactions. |
 | **Bazantic** | **Backend (`AgentGatewayService`)**: Exposes our API endpoints as an MCP (Model Context Protocol) server so external agents can use our platform. | **Excellent**. Bazantic wraps our existing REST endpoints. |
 
