@@ -54,7 +54,7 @@ authority over the user\'s money.
   Uniswap           \$5k              ★★★               Asset/stablecoin
   Foundation                                            conversion
 
-  Ledger            \$5k              ★★★★★             Secure agent keys
+
                                                         and human approval
 
   Privy             \$5k              ★★★★★             Wallet policies,
@@ -100,7 +100,7 @@ Fulfillment → Evidence → Outcome → Resolution
 -   **Privy:** Primary authorization layer. Enforce wallet-level
     policies, permissions, delegated access and transaction controls.
 
--   **Ledger:** Security layer for sensitive agent credentials and human
+
     confirmation before high-risk irreversible actions.
 
 -   **World:** Human-backed agent identity where the selected ETHOnline
@@ -195,7 +195,7 @@ the demo depend on the new work.
                                                   agreement → payment →
                                                   evidence → outcome
 
-  P0                      Security                Privy or Ledger as a
+  P0                      Security                Privy
                                                   technically enforced
                                                   control
 
@@ -228,7 +228,7 @@ state machine, transaction lifecycle, evidence and outcome.
 **AI / Agents:** Discovery, ranking, constrained negotiation, tool
 calling and external-agent integration.
 
-**Blockchain / Integrations:** Privy, Ledger, Graph, World and payment
+**Blockchain / Integrations:** Privy, Graph, World and payment
 integrations.
 
 **Security:** Secrets, permissions, authorization boundaries, replay

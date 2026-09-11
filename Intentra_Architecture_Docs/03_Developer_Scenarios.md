@@ -22,11 +22,10 @@ This document defines the core use cases, edge cases, and fallback flows that de
 *   **Actor:** Organization Admin (Requires maximum security).
 *   **Flow:**
     1.  External AI agent (acting for a vendor) connects to Intentra via **Bazantic** MCP Gateway and pays the x402 discovery fee.
-    2.  Agent submits an Intent to charge the Organization 10,000 HBAR for cloud services.
+    2.  Agent submits an Intent to charge the Organization 10,000 USDC for cloud services.
     3.  Organization Admin receives the Quote.
-    4.  Admin clicks "Approve" and is prompted to connect their **Ledger** hardware wallet.
-    5.  Ledger screen uses EIP-7730 Clear Signing to display: *"Pay 10,000 HBAR to CloudVendor"*. Admin presses physical buttons to sign.
-    6.  FastAPI receives the signature, and `HederaService` uses `hiero-sdk-python` to lock 10,000 HBAR in an Escrow Smart Contract.
+    4.  Admin clicks "Approve".
+    6.  FastAPI receives the signature, and `ArcService` uses `web3.py` to lock 10,000 USDC in an Escrow Smart Contract.
 
 ### Scenario 1.3: External Web2 Checkout (Virtual Card Injection)
 *   **Actor:** External AI Agent (e.g., Personal Shopper Bot).
@@ -35,7 +34,7 @@ This document defines the core use cases, edge cases, and fallback flows that de
     2.  Agent reaches the checkout screen but lacks a credit card.
     3.  Agent pings Intentra's **Bazantic** MCP Gateway: *"Need ₦300,000 for Jumia checkout."*
     4.  Intentra pauses the agent and asks the human user to authorize the Intent via their dashboard.
-    5.  User approves the Intent via **Privy** or **Ledger**.
+    5.  User approves the Intent via **Privy**.
     6.  Intentra backend calls the **Moove API** to instantly issue a one-time-use Virtual Credit Card (VCC) loaded with exactly ₦300,000.
     7.  Intentra securely passes the VCC details to the Agent.
     8.  The Agent injects the card details into the Jumia checkout form and completes the purchase.
@@ -65,7 +64,7 @@ This document defines the core use cases, edge cases, and fallback flows that de
 ### Scenario 3.1: Provider Fails to Fulfill (Automatic Refund)
 *   **Trigger:** Provider accepts a job but fails to upload Evidence to the `EvidenceService` before the strict deadline.
 *   **System Action:** Celery background worker wakes up at the deadline timestamp.
-*   **Result:** The smart contract (Hedera) or pending fiat state is cancelled. Funds are automatically refunded to the Consumer. Provider's Trust Score is slashed on-chain.
+*   **Result:** The smart contract (Arc) or pending fiat state is cancelled. Funds are automatically refunded to the Consumer. Provider's Trust Score is slashed on-chain.
 
 ### Scenario 3.2: Ambiguous Dispute (GenLayer -> Admin)
 *   **Trigger:** Consumer claims the painter used the wrong color. Provider uploads photos claiming it is correct. Consumer hits "File Complaint".

@@ -8,21 +8,16 @@ Privy is a comprehensive toolkit for Web3 authentication. For Intentra, Privy ac
 *   **Integration (Backend):** We will use the official server-side Python SDK provided by Privy in our FastAPI backend to verify OIDC/JWKS authentication tokens attached to API requests and manage user profiles.
 *   **Agent Wallets:** Privy supports provisioning non-custodial **embedded wallets**, which can be tied to the AI agent. The agent can use this wallet, but policies will dictate transaction limits.
 
-## 2. Hedera (Payment Rail & Agent Tools)
-Hedera will serve as the actual settlement network for our hackathon-specific crypto payment rail, utilizing HBAR (the native currency).
-*   **Integration (Backend):** We will use the officially recognized community SDK `hiero-sdk-python` for core network execution in our FastAPI backend.
-*   **Agent Toolkit:** We will utilize the `hedera-agent-kit` with LangChain. This allows our internal agents to use plugins like `core_account_plugin` to execute HBAR transfers and query balances.
-*   **Human-in-the-Loop Execution:** The `hedera-agent-kit` supports `AgentMode.RETURN_BYTES`. This is a massive security feature for Intentra: the AI agent can formulate a transaction, return the raw bytes, and Intentra passes those bytes to the frontend for the user to securely sign (e.g., via Ledger clear signing) before execution.
+## 2. Arc (Payment Rail)
+Arc will serve as the actual settlement network for our hackathon-specific crypto payment rail, utilizing USDC.
+*   **Integration (Backend):** We will use standard Web3 tools (`web3.py`) to execute USDC transfers and query balances.
+*   **Human-in-the-Loop Execution:** The AI agent can formulate a transaction, return the raw bytes, and Intentra passes those bytes to the frontend for the user to securely sign before execution.
 
 ## 3. World ID (Human Verification)
 World ID (formerly Worldcoin) proves that the actor is a unique human, preventing Sybil attacks or unauthorized agent looping.
 *   **Integration (Backend):** With the latest **World ID 4.0**, we must implement **RP (Relying Party) Signatures** on the backend to prevent impersonation. The FastAPI backend will then forward the proof payload to World's `/v4/verify/{rp_id}` REST API.
 *   **Data Model Constraints:** The backend must store the unique proof **nullifier** in the PostgreSQL database as a `NUMERIC(78, 0)` to securely represent the 256-bit integer and prevent double-verifications.
 
-## 4. Ledger (Clear Signing & Security)
-Ledger enforces hardware security for high-risk, irreversible actions. We want to implement **Clear Signing** (ERC-7730) so users see exactly what they are approving, rather than blind hex strings.
-*   **Integration (Frontend):** We will use the `@ledgerhq/ledger-wallet-provider-evm` web component SDK to initialize an EIP-1193 provider (`initializeLedgerProvider`). This automatically handles the UI, USB/Bluetooth transport, and enables Clear Signing out of the box.
-*   **Custom Descriptors:** To support Intentra-specific transactions, we will need to create an ERC-7730 JSON metadata file that maps our smart contract/transaction fields to human-readable text (e.g., "Pay Provider", "Amount: 150"). This ensures the user's hardware device explicitly shows the action the AI is attempting to take.
 
 ## 5. The Graph (On-chain Evidence)
 The Graph indexes blockchain data, providing an immutable source of truth for transaction history and provider reputation.

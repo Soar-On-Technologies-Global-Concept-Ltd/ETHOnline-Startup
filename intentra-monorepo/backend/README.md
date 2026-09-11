@@ -7,7 +7,7 @@ This directory contains the FastAPI backend for the Intentra platform.
 *   **Database ORM:** SQLModel (SQLAlchemy)
 *   **Database Engine:** PostgreSQL via asyncpg
 *   **Task Queue:** Celery & Redis
-*   **External Integrations:** Hedera Python SDK, Moove API, Bazantic MCP, World ID REST API.
+*   **External Integrations:** Web3.py, Moove API, Bazantic MCP, World ID REST API.
 
 ## 📐 Clean Architecture Rules
 

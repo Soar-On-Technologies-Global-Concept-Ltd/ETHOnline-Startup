@@ -24,13 +24,11 @@ erDiagram
         string email
         string wallet_address
         numeric nullifier "World ID (NUMERIC 78, 0)"
-        string location_data "Shipping/GPS Coordinates"
     }
     Intent ||--o{ Quote : receives
     Intent {
         string id PK
         string user_id FK
-        string initiator_agent_id "External Agent Identity"
         string description
         string status
     }
@@ -40,7 +38,6 @@ erDiagram
         string intent_id FK
         string provider_id
         decimal amount
-        string currency "e.g. NGN, USD, HBAR"
         float trust_score "From The Graph"
     }
     Transaction ||--o{ Payment : has
@@ -48,7 +45,7 @@ erDiagram
         string id PK
         string quote_id FK
         string status "LOCKED, COMPLETED"
-        string escrow_tx_hash "Hedera"
+        string escrow_tx_hash "Arc"
     }
     Payment {
         string id PK
@@ -71,22 +68,20 @@ sequenceDiagram
     participant Auth as Privy & World ID
     participant FastAPI as FastAPI Backend
     participant Graph as The Graph
-    participant Ledger as Ledger (Hardware)
-    participant Hedera as Hedera Network
+
+    participant Arc as Arc Network
     participant Moove as Moove API
 
-    User->>NextJS: Log in & Verify Human
-    NextJS->>Auth: Authenticate
-    Auth-->>NextJS: JWT & Proof
-    NextJS->>FastAPI: Submit Intent + Proof
+    User->>FastAPI: Submit Intent (Natural Language)
+    FastAPI->>Auth: Verify Human (World ID)
+    Auth-->>FastAPI: Success / Nullifier
     FastAPI->>Graph: Query Provider History
     Graph-->>FastAPI: Return Trust Score
     FastAPI-->>NextJS: Propose Quote & Score
-    User->>Ledger: Clear Sign Approval
-    Ledger-->>NextJS: Signature
+    User->>NextJS: Approve via Privy
     NextJS->>FastAPI: Submit Signature
-    FastAPI->>Hedera: Lock Funds in Escrow
-    Hedera-->>FastAPI: Transaction Hash
+    FastAPI->>Arc: Lock Funds in Escrow
+    Arc-->>FastAPI: Transaction Hash
     FastAPI->>Moove: Generate Payment Link
     Moove-->>FastAPI: moove_link_id
     FastAPI-->>NextJS: Transaction Authorized & Pending
@@ -98,9 +93,9 @@ Here is the breakdown of the FastAPI backend modules:
 
 *   **`IntentService`**: The entry point for the user. It parses natural language (e.g., "I need a painter in Lagos for max ₦250,000") into a structured JSON `Intent` object using an LLM. 
 *   **`AgentService`**: The internal AI logic. It takes the structured `Intent`, queries the database for matching providers, scores them, and generates a recommended `Quote`.
-*   **`AuthorizationService`**: The strict policy engine. It ensures that an AI agent never executes a transaction without explicit human approval or a pre-configured policy. It verifies cryptographic signatures (from Ledger) and auth tokens (from Privy).
+*   **`AuthorizationService`**: The strict policy engine. It ensures that an AI agent never executes a transaction without explicit human approval or a pre-configured policy. It verifies cryptographic signatures and auth tokens (from Privy).
 *   **`TransactionService`**: The core state machine. It manages the lifecycle: `CREATED` -> `AUTHORIZED` -> `PAYMENT_PENDING` -> `FULFILLING` -> `EVIDENCE_SUBMITTED` -> `RESOLVED`.
-*   **`PaymentService` (The Adapter)**: Handles moving money. It looks at the `currency` of the transaction and routes it to the correct adapter (Moove for fiat, Hedera for crypto).
+*   **`PaymentService` (The Adapter)**: Handles moving money. It looks at the `currency` of the transaction and routes it to the correct adapter (Moove for fiat, Arc for crypto).
 *   **`Evidence & Fulfillment Service`**: Manages the upload of photos, receipts, or on-chain data proving the job was completed.
 *   **`TrustService`**: Calculates a provider's reputation score based on past successful transactions and on-chain history.
 *   **`AgentGatewayService`**: The public-facing API for *external* agents (via Bazantic) to interact with Intentra.
@@ -112,11 +107,11 @@ Here is exactly where each partner fits into the architecture, and how easily th
 | Partner | Where it is Included | Python SDK Compatibility |
 | :--- | :--- | :--- |
 | **Privy** | **Frontend**: Handles login UI and embedded wallets.<br>**Backend (`AuthorizationService`)**: Verifies the JWT tokens on API requests. | **Excellent**. Privy provides an official server-side Python SDK. We will use it to verify tokens securely and manage user data/embedded wallets from the backend. |
-| **Ledger** | **Frontend**: User connects hardware wallet to "Clear Sign" the transaction details (ERC-7730).<br>**Backend (`AuthorizationService`)**: Verifies the signature matches the transaction payload. | **Excellent**. Hardware interaction is purely frontend (JS). The backend just uses standard Python cryptography (`eth_account`) to verify the signature. |
+
 | **World ID** | **Frontend**: Widget for users to prove humanness.<br>**Backend (`IdentityService`)**: Verifies the zero-knowledge proof before onboarding or high-risk actions. | **Excellent**. World ID uses standard REST APIs to verify the cryptographic proofs. Easy to call via Python's `httpx` or `requests`. |
 | **The Graph** | **Backend (`TrustService` & `EvidenceService`)**: Queries decentralized subgraphs to fetch a provider's historical on-chain fulfillment records. | **Excellent**. The Graph uses standard GraphQL. We can query it easily using Python's `gql` or standard `httpx` POST requests. |
 | **Moove** | **Backend (`PaymentService`)**: Generates fiat payment links and listens for webhooks when the user pays the Lagos painter in Naira. | **Excellent**. Moove operates via standard REST APIs and Webhooks. |
-| **Hedera** | **Backend (`PaymentService`)**: Executes HBAR transfers if the transaction is crypto-native. | **Excellent**. We will use the officially recognized `hiero-sdk-python` directly within our FastAPI backend to execute raw cryptographic transactions. |
+| **Arc** | **Backend (`PaymentService`)**: Executes USDC transfers if the transaction is crypto-native. | **Excellent**. We will use the officially recognized `web3.py` directly within our FastAPI backend to execute raw cryptographic transactions. |
 | **Bazantic** | **Backend (`AgentGatewayService`)**: Exposes our API endpoints as an MCP (Model Context Protocol) server so external agents can use our platform. | **Excellent**. Bazantic wraps our existing REST endpoints. |
 
 ## 4. What Can the Agents Do?
@@ -127,7 +122,7 @@ In Intentra, the AI is a **facilitator**, not an autocratic decision-maker.
 1.  **Understand Intent**: Translate messy human requests into strict constraints (Budget: $200, Location: Lagos, Deadline: Friday).
 2.  **Discover & Recommend**: Search the provider database, analyze trust scores (from The Graph), and recommend the top 3 options to the user.
 3.  **Negotiate**: The agent can interact with providers to negotiate a final price, *but only within the user's pre-approved budget*.
-4.  **Propose Transaction**: The agent drafts the final `Quote` and pauses. It **cannot** move money. It must request Authorization from the human (via Privy or Ledger).
+4.  **Propose Transaction**: The agent drafts the final `Quote` and pauses. It **cannot** move money. It must request Authorization from the human (via Privy).
 
 **External Agents (Built by others via Bazantic):**
 1.  An external AI (like a company's procurement bot) can hit our `AgentGatewayService`.

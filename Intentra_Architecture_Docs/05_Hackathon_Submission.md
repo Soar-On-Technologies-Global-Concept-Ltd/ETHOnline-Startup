@@ -34,7 +34,7 @@ Our hackathon demo walks through a single, end-to-end accountable transaction:
 
 ---
 
-## 🏗️ Architecture (The 3 Pillars)
+##  Architecture (The 3 Pillars)
 
 Intentra is built on a strict separation of concerns to ensure funds are never at risk:
 
@@ -44,7 +44,7 @@ Intentra is built on a strict separation of concerns to ensure funds are never a
 
 ---
 
-## 🤝 Partner Technologies Used
+##  Partner Technologies Used
 
 *   **Arc (Primary Settlement):** Our `IntentraEscrow.sol` contract is deployed on the Arc testnet. It acts as a conditional, multi-step settlement engine utilizing USDC.
 *   **The Graph:** Used by our AI Agent to retrieve live on-chain trust scores for providers by querying `EvidenceAnchored` and `DisputeOpened` events on the Arc testnet. This is a core data source before AI makes any recommendations.
