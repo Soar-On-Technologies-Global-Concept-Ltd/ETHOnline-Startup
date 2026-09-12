@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
-import { BookOpen, ShieldCheck, Zap, Bot, ArrowRight, Lock, ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { BookOpen, ShieldCheck, Zap, Bot, ArrowRight } from 'lucide-react';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
 
 export default function DocsPage() {
   return (
@@ -20,12 +20,12 @@ export default function DocsPage() {
           </div>
           <div className="flex items-center gap-4">
             <Link href="/dashboard">
-              <Button variant="ghost" className="hidden sm:flex">Dashboard</Button>
+              <PrimaryButton variant="secondary" className="hidden sm:flex">Dashboard</PrimaryButton>
             </Link>
             <Link href="/">
-              <Button className="rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20">
+              <PrimaryButton className="rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20">
                 Launch App
-              </Button>
+              </PrimaryButton>
             </Link>
           </div>
         </div>
@@ -62,7 +62,7 @@ export default function DocsPage() {
             <div className="p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
               <h3 className="text-xl font-semibold mb-3">Intent Matching</h3>
               <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                Users submit natural language "Intents" (e.g. "I need a plumber tomorrow"). Our AI engines instantly parse the requirements, budget, and location to find the perfect matched provider in our decentralized network.
+                Users submit natural language &quot;Intents&quot; (e.g. &quot;I need a plumber tomorrow&quot;). Our AI engines instantly parse the requirements, budget, and location to find the perfect matched provider in our decentralized network.
               </p>
             </div>
             <div className="p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
@@ -140,9 +140,9 @@ export default function DocsPage() {
           <h2 className="text-2xl font-bold mb-4">Ready to experience the future of service agreements?</h2>
           <p className="text-blue-100 mb-8 max-w-lg mx-auto">Try our testnet demo today and see how AI and Web3 combine to create trustless, frictionless commerce.</p>
           <Link href="/">
-            <Button size="lg" variant="secondary" className="rounded-full text-blue-600 font-semibold px-8 hover:bg-white transition-colors">
+            <PrimaryButton variant="secondary" className="rounded-full text-blue-600 font-semibold px-8 hover:bg-white transition-colors">
               Open App <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
+            </PrimaryButton>
           </Link>
         </div>
 
