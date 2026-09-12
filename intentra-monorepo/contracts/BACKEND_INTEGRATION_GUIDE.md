@@ -59,3 +59,31 @@ The smart contracts are currently deployed live on the **Arc Testnet** (Chain ID
 These addresses and the full ABI are exported in `intentra-monorepo/contracts/exports/intentra-contracts.ts`. Ensure your backend `.env` variables and the Graph subgraphs are pointing to these live addresses.
 
 For instructions on how to deploy or interact with the contract using a MetaMask account, please refer to the `README.md` file in this directory.
+
+## 4. Smart Contract API Reference (Endpoints & Events)
+
+To fully integrate the backend, your `web3.py` service must interact with the following endpoints (functions) and listen to the following events.
+
+### Core Write Functions (Transactions)
+*   `createIntent(address provider, address token, uint256 amount)`: Initializes a new job.
+*   `fundIntent(uint256 intentId)`: Locks the USDC in escrow (Customer must call `usdc.approve()` first).
+*   `raiseDispute(uint256 intentId)`: Moves state from `FUNDED` to `IN_DISPUTE`.
+*   `submitAIProposal(uint256 intentId, uint256 customerAmount, uint256 providerAmount)`: **[AI ARBITRATOR ONLY]** Submits a resolution and starts the 48-hour timelock.
+*   `executeWithSignatures(uint256 intentId, uint256 customerAmount, uint256 providerAmount, bytes sigA, bytes sigB)`: Resolves the intent immediately if 2-of-3 signatures are valid.
+*   `escalateAppeal(uint256 intentId)`: **[PAYABLE]** Escalates an AI proposal to a human during the 48-hour timelock by staking native ETH.
+*   `resolveHumanAppeal(uint256 intentId, uint256 customerAmount, uint256 providerAmount)`: **[OWNER ONLY]** Concludes an escalated dispute.
+*   `executeAbandonment(uint256 intentId)`: Forces resolution if no action has been taken for 14 days.
+
+### Core Read Functions (Views)
+*   `getIntent(uint256 intentId)`: Returns the full `Intent` struct containing the state, amounts, and participants.
+*   `getProposal(uint256 intentId)`: Returns the active `Proposal` struct (who proposed it, amounts, and timestamp).
+
+### Events to Listen For (The Graph / Webhooks)
+Your backend should index these events to trigger state changes in your database:
+*   `IntentCreated(uint256 indexed intentId, address indexed customer, address indexed provider, address token, uint256 amount)`
+*   `IntentFunded(uint256 indexed intentId, uint256 amount)`
+*   `DisputeRaised(uint256 indexed intentId, address indexed raisedBy)`
+*   `AIProposalSubmitted(uint256 indexed intentId, uint256 customerAmount, uint256 providerAmount)`
+*   `AppealEscalated(uint256 indexed intentId, address indexed appellant, uint256 stake)`
+*   `IntentResolved(uint256 indexed intentId, uint256 customerAmount, uint256 providerAmount)`
+*   `AbandonmentExecuted(uint256 indexed intentId, address indexed triggeredBy)`
