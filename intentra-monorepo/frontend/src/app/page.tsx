@@ -20,20 +20,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col selection:bg-white/20 selection:text-white">
-      {/* Precision Glass Navigation */}
-      <nav className="glass-nav px-6 py-3.5 fixed top-0 left-0 right-0 z-50 flex justify-between items-center max-w-7xl mx-auto">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-md bg-white text-black font-display font-extrabold flex items-center justify-center text-sm shadow-sm">
-            I
-          </div>
-          <span className="text-lg font-display font-bold tracking-tight text-foreground">Intentra</span>
-        </div>
-        <PrimaryButton variant="glass" className="px-4 py-1.5 text-xs font-mono uppercase tracking-widest font-semibold" onClick={login} disabled={!ready}>
-          {authenticated ? "Enter App" : "Connect Wallet"}
-        </PrimaryButton>
-      </nav>
-
-      <main className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-32 pb-20 max-w-5xl mx-auto">
+      <main className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-24 pb-20 max-w-5xl mx-auto">
         {/* Simple Text Tag */}
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
