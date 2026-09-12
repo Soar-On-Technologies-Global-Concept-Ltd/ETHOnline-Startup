@@ -27,7 +27,9 @@ export interface ProviderProfile {
   verified?: boolean;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ethonline-startup-intentra.onrender.com";
+const cleanBaseUrl = rawApiUrl.replace(/\/+$/, "");
+const API_BASE_URL = cleanBaseUrl.endsWith("/v1") ? cleanBaseUrl : `${cleanBaseUrl}/v1`;
 
 export async function parseAndCreateIntent(rawPrompt: string, token: string): Promise<Intent> {
   try {
