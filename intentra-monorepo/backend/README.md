@@ -169,15 +169,9 @@ The abuse cases are tests, not prose — `tests/test_security_db.py` over HTTP a
 
 ### On Render
 
-`render.yaml` is a blueprint for a free Postgres and a Docker web service. Render reads blueprints from the
-repository root, so copy it up before creating one:
-
-```bash
-cp intentra-monorepo/backend/render.yaml render.yaml
-```
-
-Then **New → Blueprint** in Render. By hand instead: a Web Service with Root Directory `intentra-monorepo/backend`,
-runtime Docker, health check `/healthz`, and the environment variables listed in the blueprint.
+`render.yaml` at the repository root is a blueprint for a free Postgres and a Docker web service: in Render,
+**New → Blueprint**, pick the repository, apply. By hand instead: a Web Service with Root Directory
+`intentra-monorepo/backend`, runtime Docker, health check `/healthz`, and the blueprint's environment variables.
 
 The container runs `scripts/start.sh`: migrate, optionally seed, then serve on `$PORT`. Four things the platform
 does that would otherwise break the boot are handled for you — its `postgresql://` URL is rewritten to `asyncpg`,

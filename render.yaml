@@ -1,8 +1,7 @@
 # Render blueprint for the Intentra backend.
 #
-# Render reads a blueprint from the REPOSITORY ROOT, so copy this file there before creating the Blueprint:
-#     cp intentra-monorepo/backend/render.yaml render.yaml
-# The paths below are already written relative to the repository root.
+# Lives at the repository root because that is the only place Render reads a blueprint from. In Render:
+# New -> Blueprint -> pick this repository -> Apply.
 #
 # Prefer the dashboard? Create a Web Service by hand with:
 #     Root Directory  intentra-monorepo/backend
