@@ -1,7 +1,8 @@
 """The chain decides money states. Escrow logs are read here and turned into state, through each domain's service.
 
-This is the only place FUNDED, DELIVERED, RELEASED, DISPUTED, SETTLED and refund-CANCELLED are applied, and every one
-of them is checked field by field against what the backend actually requested (schematics §5.3, §9.1).
+The canonical IntentraEscrow keys everything on an auto-incrementing `intentId`, so the first job is binding that id
+to our transaction: the customer's wallet sends `createIntent`, reports the hash, and the `IntentCreated` log on that
+hash tells us which transaction it belongs to. Every later event is looked up by the id.
 """
 import asyncio
 import logging
@@ -15,14 +16,10 @@ from app.core.db import session_scope
 from app.core.logging import log, transaction_id_var
 from app.core.models import KvCursor
 from app.core.states import Event
-from app.domains.authorization import service as authorization
 from app.domains.disputes import service as disputes
-from app.domains.evidence import service as evidence
-from app.domains.fulfillment import service as fulfillment
-from app.domains.identity import service as identity
 from app.domains.intents import service as intents
+from app.domains.fulfillment import service as fulfillment
 from app.domains.payments import service as payments
-from app.domains.providers import service as providers
 from app.domains.transactions import machine
 from app.domains.transactions import service as transactions
 from app.integrations.arc import client as arc_client
@@ -32,125 +29,132 @@ logger = logging.getLogger("chain")
 CURSOR_KEY = "watcher_block"
 
 
-def _hex_eq(a, b) -> bool:
-    return a is not None and b is not None and str(a).lower() == str(b).lower()
-
-
 def _at(seconds: int) -> datetime:
     return datetime.fromtimestamp(int(seconds), tz=timezone.utc)
 
 
-async def _job_funded(s: AsyncSession, tx, ev: DecodedLog) -> str | None:
-    auth = await authorization.latest(s, tx.id)
-    if auth is None:
-        return "funded without an authorization on file"
+async def _intent_created(s: AsyncSession, tx, ev: DecodedLog) -> str | None:
+    """Binds the escrow's id to this transaction and records the amount the chain actually holds."""
     a = ev.args
-    checks = {
-        "customer": _hex_eq(a["customer"], await identity.wallet_of(s, tx.customer_id)),
-        "provider": _hex_eq(a["provider"], await providers.wallet_of(s, tx.provider_id)),
-        "amount": int(a["amount"]) == int(tx.amount_minor or -1),
-        "authorizationHash": _hex_eq(a["authorizationHash"], auth.authorization_hash),
-        "disputeWindow": int(a["disputeWindow"]) == int(tx.dispute_window_s or -1),
-        "expiresAt": tx.expires_at is not None and int(a["expiresAt"]) == int(tx.expires_at.timestamp()),
-    }
-    wrong = sorted(k for k, ok in checks.items() if not ok)
-    if wrong:
-        return f"JobFunded does not match the authorization: {', '.join(wrong)}"
+    if int(a["amount"]) != int(tx.amount_minor or -1):
+        return f"IntentCreated is for {a['amount']}, not the {tx.amount_minor} that was authorised"
+    await transactions.bind_intent_id(s, tx, int(a["intentId"]))
+    await machine.note(s, tx, f"chain:{ev.tx_hash}", "INTENT_CREATED",
+                       {"intent_id": int(a["intentId"]), "amount_minor": int(a["amount"]), "tx_hash": ev.tx_hash})
+    return None
+
+
+async def _intent_funded(s: AsyncSession, tx, ev: DecodedLog) -> str | None:
+    if int(ev.args["amount"]) != int(tx.amount_minor or -1):
+        return "IntentFunded for an amount that is not the authorised amount"
     try:
         block = await arc_client.w3().eth.get_block(ev.block_number)
         when = _at(block["timestamp"])
     except Exception:
         when = utcnow()
     await transactions.mark_funded(s, tx, when)
-    await payments.record(s, tx.id, "FUND", ev.tx_hash, int(a["amount"]))
+    await payments.record(s, tx.id, "FUND", ev.tx_hash, int(ev.args["amount"]))
     quote = await intents.quote_view(s, tx.quote_id)
     await fulfillment.ensure(s, tx.id, list((quote["scope"] if quote else {}).get("checklist", [])))
     await machine.apply(s, tx, Event.FUNDED_ONCHAIN, f"chain:{ev.tx_hash}",
-                        {"amount_minor": int(a["amount"]), "tx_hash": ev.tx_hash, "block": ev.block_number})
+                        {"amount_minor": int(ev.args["amount"]), "tx_hash": ev.tx_hash, "block": ev.block_number})
     return None
 
 
-async def _evidence_anchored(s: AsyncSession, tx, ev: DecodedLog) -> str | None:
-    if not await evidence.mark_anchored(s, tx.id, str(ev.args["evidenceHash"]), ev.tx_hash):
-        return "anchored a hash that is not evidence of this transaction"
-    await machine.note(s, tx, f"chain:{ev.tx_hash}", "TX_MINED", {"kind": "ANCHOR", "tx_hash": ev.tx_hash})
-    return None
-
-
-async def _submitted(s: AsyncSession, tx, ev: DecodedLog) -> str | None:
-    expected = await fulfillment.expected_deliverable(s, tx.id)
-    if not _hex_eq(ev.args["deliverableHash"], expected):
-        return "Submitted carries a deliverable hash the backend did not build"
-    await transactions.mark_delivered(s, tx, _at(ev.args["releaseAfter"]))
-    await fulfillment.mark_delivered(s, tx.id, ev.tx_hash, tx.delivered_at)
-    await machine.apply(s, tx, Event.DELIVERED_ONCHAIN, f"chain:{ev.tx_hash}",
-                        {"deliverable_hash": expected, "release_after": tx.release_after, "tx_hash": ev.tx_hash})
-    return None
-
-
-async def _dispute_opened(s: AsyncSession, tx, ev: DecodedLog) -> str | None:
-    expected = await disputes.complaint_hash_for(s, tx.id)
-    if not _hex_eq(ev.args["complaintHash"], expected):
-        return "DisputeOpened carries a complaint hash that is not on file"
+async def _dispute_raised(s: AsyncSession, tx, ev: DecodedLog) -> str | None:
+    if await disputes.for_transaction(s, tx.id) is None:
+        return "DisputeRaised for a job with no complaint on file"
     await disputes.mark_open(s, tx.id)
     await machine.apply(s, tx, Event.DISPUTE_OPENED_ONCHAIN, f"chain:{ev.tx_hash}",
-                        {"complaint_hash": expected, "tx_hash": ev.tx_hash})
+                        {"raised_by": ev.args.get("raisedBy"), "tx_hash": ev.tx_hash})
     return None
 
 
-async def _released(s: AsyncSession, tx, ev: DecodedLog) -> str | None:
-    if int(ev.args["amount"]) != int(tx.amount_minor or -1):
-        return "Released for an amount that is not the escrow amount"
-    await payments.record(s, tx.id, "RELEASE", ev.tx_hash, int(ev.args["amount"]))
-    await machine.apply(s, tx, Event.RELEASED_ONCHAIN, f"chain:{ev.tx_hash}",
-                        {"amount_minor": int(ev.args["amount"]), "tx_hash": ev.tx_hash})
-    return None
-
-
-async def _resolved(s: AsyncSession, tx, ev: DecodedLog) -> str | None:
-    settlement = await disputes.settlement_view(s, tx.id)
-    if settlement is None:
-        return "Resolved without a proposal on file"
+async def _ai_proposal_submitted(s: AsyncSession, tx, ev: DecodedLog) -> str | None:
+    """The contract is now TIMELOCKED: either party has 48 hours to escalate to a human before this can execute."""
+    expected = await disputes.settlement_view(s, tx.id)
+    if expected is None:
+        return "AIProposalSubmitted without a proposal on file"
     a = ev.args
-    if not (_hex_eq(a["outcomeHash"], settlement["outcome_hash"])
-            and int(a["toProvider"]) == settlement["to_provider_minor"]
-            and int(a["toCustomer"]) == settlement["to_customer_minor"]):
-        return "Resolved does not match the accepted proposal"
-    await payments.record(s, tx.id, "SETTLE_PROVIDER", f"{ev.tx_hash}:provider", int(a["toProvider"]))
-    await payments.record(s, tx.id, "SETTLE_CUSTOMER", f"{ev.tx_hash}:customer", int(a["toCustomer"]))
-    await disputes.mark_settled(s, tx.id)
-    await machine.apply(s, tx, Event.SETTLED_ONCHAIN, f"chain:{ev.tx_hash}",
-                        {"provider_bps": settlement["provider_bps"], "to_provider_minor": int(a["toProvider"]),
-                         "to_customer_minor": int(a["toCustomer"]), "outcome_hash": settlement["outcome_hash"],
+    if int(a["customerAmount"]) != expected["to_customer_minor"] or int(a["providerAmount"]) != expected["to_provider_minor"]:
+        return "AIProposalSubmitted does not match the proposal the backend recorded"
+    await disputes.mark_timelocked(s, tx.id, _at(await _block_time(ev)))
+    await machine.note(s, tx, f"chain:{ev.tx_hash}", "TX_MINED",
+                       {"kind": "AI_PROPOSAL", "tx_hash": ev.tx_hash, "appeal_window_hours": 48})
+    return None
+
+
+async def _appeal_escalated(s: AsyncSession, tx, ev: DecodedLog) -> str | None:
+    await disputes.mark_appealed(s, tx.id, ev.args.get("appellant"), int(ev.args.get("stake", 0)))
+    await machine.apply(s, tx, Event.ESCALATION_REQUIRED, f"chain:{ev.tx_hash}",
+                        {"appellant": ev.args.get("appellant"), "stake": int(ev.args.get("stake", 0)),
                          "tx_hash": ev.tx_hash})
     return None
 
 
-async def _refunded(s: AsyncSession, tx, ev: DecodedLog) -> str | None:
-    await payments.record(s, tx.id, "REFUND", ev.tx_hash, int(ev.args["amount"]))
-    tx.close_reason = "refunded"
-    await machine.apply(s, tx, Event.REFUNDED_ONCHAIN, f"chain:{ev.tx_hash}",
-                        {"amount_minor": int(ev.args["amount"]), "tx_hash": ev.tx_hash})
+async def _intent_resolved(s: AsyncSession, tx, ev: DecodedLog) -> str | None:
+    """One event covers both endings: everything to the provider is a release, anything else is a settlement."""
+    a = ev.args
+    to_customer, to_provider = int(a["customerAmount"]), int(a["providerAmount"])
+    total = int(tx.amount_minor or 0)
+    if to_customer + to_provider != total:
+        return f"IntentResolved pays {to_customer + to_provider}, not the {total} held in escrow"
+    if to_customer == 0:
+        await payments.record(s, tx.id, "RELEASE", ev.tx_hash, to_provider)
+        await machine.apply(s, tx, Event.RELEASED_ONCHAIN, f"chain:{ev.tx_hash}",
+                            {"amount_minor": to_provider, "tx_hash": ev.tx_hash})
+        return None
+    expected = await disputes.settlement_view(s, tx.id)
+    if expected is not None and (expected["to_customer_minor"] != to_customer
+                                 or expected["to_provider_minor"] != to_provider):
+        return "IntentResolved does not match the accepted proposal"
+    await payments.record(s, tx.id, "SETTLE_PROVIDER", f"{ev.tx_hash}:provider", to_provider)
+    await payments.record(s, tx.id, "SETTLE_CUSTOMER", f"{ev.tx_hash}:customer", to_customer)
+    await disputes.mark_settled(s, tx.id)
+    await machine.apply(s, tx, Event.SETTLED_ONCHAIN, f"chain:{ev.tx_hash}",
+                        {"to_provider_minor": to_provider, "to_customer_minor": to_customer, "tx_hash": ev.tx_hash})
     return None
 
 
-HANDLERS = {"JobFunded": _job_funded, "EvidenceAnchored": _evidence_anchored, "Submitted": _submitted,
-            "DisputeOpened": _dispute_opened, "Released": _released, "Resolved": _resolved, "Refunded": _refunded}
+async def _abandonment_executed(s: AsyncSession, tx, ev: DecodedLog) -> str | None:
+    """Nobody acted for fourteen days, so the contract closed the job itself."""
+    tx.close_reason = "abandoned"
+    await machine.note(s, tx, f"chain:{ev.tx_hash}", "ABANDONMENT_EXECUTED",
+                       {"triggered_by": ev.args.get("triggeredBy"), "tx_hash": ev.tx_hash})
+    return None
+
+
+async def _block_time(ev: DecodedLog) -> int:
+    try:
+        return int((await arc_client.w3().eth.get_block(ev.block_number))["timestamp"])
+    except Exception:
+        return int(utcnow().timestamp())
+
+
+HANDLERS = {"IntentCreated": _intent_created, "IntentFunded": _intent_funded, "DisputeRaised": _dispute_raised,
+            "AIProposalSubmitted": _ai_proposal_submitted, "AppealEscalated": _appeal_escalated,
+            "IntentResolved": _intent_resolved, "AbandonmentExecuted": _abandonment_executed}
+
+
+async def _transaction_for(s: AsyncSession, ev: DecodedLog):
+    """IntentCreated is matched by the hash the wallet reported; everything after it by the escrow's own id."""
+    if ev.name == "IntentCreated":
+        return await payments.transaction_for_reported_tx(s, ev.tx_hash)
+    return await machine.lock_by_intent_id(s, int(ev.args["intentId"]))
 
 
 async def handle_log(ev: DecodedLog) -> None:
     """One database transaction per log: the event row, the state change and its audit row commit together."""
     async with session_scope() as s:
         fresh = await payments.record_event(s, name=ev.name, tx_hash=ev.tx_hash, log_index=ev.log_index,
-                                            block_number=ev.block_number, contract=ev.contract, tx_key=ev.tx_key,
-                                            payload=ev.args)
+                                            block_number=ev.block_number, contract=ev.contract,
+                                            tx_key=str(ev.args.get("intentId", "")), payload=ev.args)
         if not fresh:
             return                      # a replayed log changes nothing (FR-9)
-        tx = await machine.lock_by_key(s, ev.tx_key)
+        tx = await _transaction_for(s, ev)
         if tx is None:
-            await payments.mark_event(s, ev.tx_hash, ev.log_index, handled=False,
-                                      error="no transaction for this tx_key")
-            log(logger, "chain event for an unknown transaction", event=ev.name, tx_key=ev.tx_key, tx_hash=ev.tx_hash)
+            await payments.mark_event(s, ev.tx_hash, ev.log_index, handled=False, error="no transaction for this intent")
+            log(logger, "chain event for an unknown intent", event=ev.name, tx_hash=ev.tx_hash)
             return
         transaction_id_var.set(str(tx.id))
         try:

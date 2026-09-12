@@ -23,10 +23,10 @@ class Settings(BaseSettings):
     # Arc
     arc_rpc_url: str = "https://rpc.testnet.arc.io"
     arc_chain_id: int = 5042002
-    escrow_address: str = "0x0000000000000000000000000000000000000000"
-    escrow_deploy_block: int = 0
-    usdc_address: str = "0x3600000000000000000000000000000000000000"
-    resolver_private_key: SecretStr | None = None
+    escrow_address: str = "0xeF3a099CC877F6e274b037847A6ee44C4d62648D"   # live on Arc testnet
+    escrow_deploy_block: int = 61719028   # the block IntentraEscrow was deployed in
+    usdc_address: str = "0xFa5a5744898B71c93fF80F179d95184864143190"     # the escrow's 6-decimal mock USDC
+    resolver_private_key: SecretStr | None = None   # the AI arbitrator key: one of the three signers
     confirmations: int = 1
     explorer_base_url: str = "https://testnet.arcscan.app"
     min_max_fee_gwei: int = 20
@@ -93,6 +93,21 @@ class Settings(BaseSettings):
     watch_interval_seconds: float = 3.0
     reconcile_interval_seconds: float = 15.0
     outbox_poll_seconds: float = 2.0
+
+    @model_validator(mode="after")
+    def _escrow_is_pinned_outside_dev(self) -> "Settings":
+        """A deployment that never learned where the escrow is, or when it was deployed, fails quietly rather than
+        loudly: the watcher starts at the chain head and simply never sees an event that happened before boot."""
+        if self.env in ("staging", "prod"):
+            problems = []
+            if int(self.escrow_address, 16) == 0:
+                problems.append("ESCROW_ADDRESS is the zero address")
+            if self.escrow_deploy_block <= 0:
+                problems.append("ESCROW_DEPLOY_BLOCK is not set, so the watcher would start at the chain head and "
+                                "miss every event before it")
+            if problems:
+                raise ValueError("; ".join(problems))
+        return self
 
     @model_validator(mode="after")
     def _no_placeholder_secrets_outside_dev(self) -> "Settings":

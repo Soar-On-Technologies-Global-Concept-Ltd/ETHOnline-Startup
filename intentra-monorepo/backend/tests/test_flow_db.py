@@ -69,9 +69,15 @@ def sign(key: str, typed: dict) -> str:
     return "0x" + bytes(Account.sign_message(encode_typed_data(full_message=typed), private_key=key).signature).hex()
 
 
-def chain_event(name: str, tx_key: str, args: dict, index: int = 0) -> DecodedLog:
-    return DecodedLog(name=name, tx_hash="0x" + uuid.uuid4().hex + uuid.uuid4().hex, log_index=index, block_number=100 + index,
-                      contract=get_settings().escrow_address.lower(), tx_key=tx_key.lower(), args={"txKey": tx_key.lower(), **args})
+def chain_event(name: str, intent_id: int, args: dict, index: int = 0, tx_hash: str | None = None) -> DecodedLog:
+    """The canonical escrow keys everything on intentId; IntentCreated is matched by the reported hash instead."""
+    return DecodedLog(name=name, tx_hash=(tx_hash or ("0x" + uuid.uuid4().hex + uuid.uuid4().hex)).lower(),
+                      log_index=index, block_number=100 + index, contract=get_settings().escrow_address.lower(),
+                      tx_key=str(intent_id), args={"intentId": int(intent_id), **args})
+
+
+def reported_hash() -> str:
+    return "0x" + uuid.uuid4().hex + uuid.uuid4().hex
 
 
 async def setup_parties(s) -> tuple[User, User, Provider]:
@@ -121,17 +127,30 @@ async def walk_to_delivered(fake_llm) -> dict:
         status, _ = await authorization.record(s, tx, ids["customer"], signature, signer, digest, human)
         assert status == 200 and tx.state == TxState.AUTHORIZED.value
 
+    # Phase one: the escrow assigns the id, so the wallet sends createIntent and reports the hash.
     async with session_scope() as s:
         tx = await machine.lock(s, ids["tx"])
-        status, body = await payments.fund_calls(s, tx, ids["customer"], Account.from_key(PROVIDER_KEY).address)
-        assert [c["fn"] for c in body["calls"]] == ["approve", "fund"]
-        ids["fund_args"] = body["calls"][1]["args"]
+        _, body = await payments.fund_calls(s, tx, ids["customer"], Account.from_key(PROVIDER_KEY).address)
+        assert body["step"] == "create_intent" and body["calls"][0]["fn"] == "createIntent"
         assert tx.state == TxState.FUNDING.value
+    create_hash = reported_hash()
+    async with session_scope() as s:
+        tx = await machine.lock(s, ids["tx"])
+        await payments.report_chain_tx(s, tx, ids["customer"], "CREATE_INTENT", create_hash)
+    ids["intent_id"] = 41
+    await handle_log(chain_event("IntentCreated", ids["intent_id"], tx_hash=create_hash,
+                                 args={"customer": Account.from_key(CUSTOMER_KEY).address.lower(),
+                                       "provider": Account.from_key(PROVIDER_KEY).address.lower(),
+                                       "token": get_settings().usdc_address.lower(), "amount": 100_000_000}))
+    async with sessionmaker()() as s:
+        assert (await s.get(Transaction, ids["tx"])).escrow_intent_id == ids["intent_id"]
 
-    tx_key, args = ids["tx_key"], ids["fund_args"]
-    funded = {"customer": Account.from_key(CUSTOMER_KEY).address.lower(), "provider": args[1].lower(), "amount": int(args[2]),
-              "authorizationHash": args[3], "disputeWindow": int(args[4]), "expiresAt": int(args[5])}
-    await handle_log(chain_event("JobFunded", tx_key, funded))
+    # Phase two: approve and fund, then the escrow confirms it holds the money.
+    async with session_scope() as s:
+        tx = await machine.lock(s, ids["tx"])
+        _, body = await payments.fund_calls(s, tx, ids["customer"], Account.from_key(PROVIDER_KEY).address)
+        assert body["step"] == "fund_intent" and [c["fn"] for c in body["calls"]] == ["approve", "fundIntent"]
+    await handle_log(chain_event("IntentFunded", ids["intent_id"], {"amount": 100_000_000}, index=1))
     async with sessionmaker()() as s:
         assert (await s.get(Transaction, ids["tx"])).state == TxState.FUNDED.value
 
@@ -146,36 +165,44 @@ async def walk_to_delivered(fake_llm) -> dict:
             tx = await machine.lock(s, ids["tx"])
             await evidence_service.record(s, tx, ids["provider_user"], "provider", EvidenceKind.AFTER_PHOTO, room,
                                           f"{room} second coat", stored)
-        await handle_log(chain_event("EvidenceAnchored", tx_key, {"evidenceHash": stored.sha256}, index=1 + index))
 
     async with sessionmaker()() as s:
         assert (await s.get(Transaction, ids["tx"])).state == TxState.EVIDENCE_SUBMITTED.value
 
+    # There is no submit() on the canonical escrow: delivery is Intentra's own record.
     async with session_scope() as s:
         tx = await machine.lock(s, ids["tx"])
         _, body = await fulfillment.deliver_call(s, tx, ids["provider_user"])
         ids["deliverable_hash"] = body["deliverable_hash"]
-
-    await handle_log(chain_event("Submitted", tx_key, {"deliverableHash": ids["deliverable_hash"], "releaseAfter": 4_102_444_800}, index=3))
-    async with sessionmaker()() as s:
-        tx = await s.get(Transaction, ids["tx"])
-        assert tx.state == TxState.DELIVERED.value and tx.release_after is not None
+        assert tx.state == TxState.DELIVERED.value
     return ids
 
 
 async def test_the_happy_path_ends_with_the_provider_paid(db, fake_llm):
     ids = await walk_to_delivered(fake_llm)
+    # Paying the provider in full is a resolution: the customer signs, the arbitrator co-signs, the resolver relays.
     async with session_scope() as s:
         tx = await machine.lock(s, ids["tx"])
-        _, body = await payments.release_call(s, tx, ids["customer"])
-        assert body["call"]["fn"] == "release"
+        _, body = await payments.release_request(s, tx, ids["customer"])
+        typed = eip712.resolution_typed_data(ids["intent_id"], 0, 100_000_000)
+        assert body["split"] == {"to_provider_minor": 100_000_000, "to_customer_minor": 0}
+    async with session_scope() as s:
+        tx = await machine.lock(s, ids["tx"])
+        status, _ = await payments.release_execute(s, tx, ids["customer"], sign(CUSTOMER_KEY, typed),
+                                                   Account.from_key(CUSTOMER_KEY).address.lower())
+        assert status == 202
+    async with sessionmaker()() as s:
+        queued = list((await s.exec(select(ChainTx).where(ChainTx.kind == "EXECUTE"))).all())
+        assert len(queued) == 1 and queued[0].args["provider_amount"] == 100_000_000
 
-    await handle_log(chain_event("Released", ids["tx_key"], {"amount": 100_000_000}, index=4))
+    await handle_log(chain_event("IntentResolved", ids["intent_id"],
+                                 {"customerAmount": 0, "providerAmount": 100_000_000}, index=4))
     async with sessionmaker()() as s:
         tx = await s.get(Transaction, ids["tx"])
         assert tx.state == TxState.RELEASED.value and tx.closed_at is not None
-        rows = list((await s.exec(select(Payment).where(Payment.transaction_id == tx.id))).all())
-        assert {p.direction: p.status for p in rows} == {"FUND": "CONFIRMED", "RELEASE": "CONFIRMED"}
+        rows = {p.direction: p.status for p in (await s.exec(select(Payment).where(Payment.transaction_id == tx.id))).all()}
+        # createIntent is reported by the wallet and stays PENDING: it is how IntentCreated found this job, not a payment.
+        assert rows == {"CREATE_INTENT": "PENDING", "FUND": "CONFIRMED", "RELEASE": "CONFIRMED"}
         timeline = await views.timeline(s, tx)
         assert timeline["verification"]["verified"] is True
         assert [e["event"] for e in timeline["events"]][:2] == ["TRANSACTION_CREATED", "INTENT_STRUCTURED"]
@@ -198,10 +225,11 @@ async def test_the_dispute_path_settles_seventy_thirty(db, fake_llm):
         status, body = await disputes.file_complaint(s, tx, ids["customer"], "INCOMPLETE",
                                                      "Second bedroom only got one coat", [complaint_evidence], human)
         assert status == 202
-        complaint_hash = body["complaint"]["complaint_hash"]
+        assert body["call"]["fn"] == "raiseDispute"      # only a party may freeze the money on-chain
         dispute_id = uuid.UUID(body["dispute"]["id"])
 
-    await handle_log(chain_event("DisputeOpened", ids["tx_key"], {"complaintHash": complaint_hash}, index=5))
+    await handle_log(chain_event("DisputeRaised", ids["intent_id"],
+                                 {"raisedBy": Account.from_key(CUSTOMER_KEY).address.lower()}, index=5))
     async with sessionmaker()() as s:
         tx = await s.get(Transaction, ids["tx"])
         assert tx.state == TxState.DISPUTED.value
@@ -221,7 +249,8 @@ async def test_the_dispute_path_settles_seventy_thirty(db, fake_llm):
         assert (proposal.remedy, proposal.provider_bps) == ("SPLIT_70_30", 7000)
         assert (proposal.to_provider_minor, proposal.to_customer_minor) == (70_000_000, 30_000_000)
         assert proposal.to_provider_minor + proposal.to_customer_minor == tx.amount_minor
-        typed = eip712.resolution_typed_data(tx.tx_key, proposal.provider_bps, proposal.outcome_hash)
+        typed = eip712.resolution_typed_data(tx.escrow_intent_id, proposal.to_customer_minor,
+                                            proposal.to_provider_minor)
         proposal_id = proposal.id
 
     for key, role, user_key in ((CUSTOMER_KEY, "customer", "customer"), (PROVIDER_KEY, "provider", "provider_user")):
@@ -231,16 +260,18 @@ async def test_the_dispute_path_settles_seventy_thirty(db, fake_llm):
             status, body = await disputes.accept(s, tx, await s.get(Dispute, dispute_id), proposal,
                                                  ids[user_key], role, sign(key, typed))
             assert status == 200
-    assert body["status"] == "SETTLING" and body["pending_tx"] == "RESOLVE"
+    assert body["status"] == "SETTLING" and body["pending_tx"] == "EXECUTE"
 
     async with sessionmaker()() as s:
-        queued = list((await s.exec(select(ChainTx).where(ChainTx.kind == "RESOLVE"))).all())
+        queued = list((await s.exec(select(ChainTx).where(ChainTx.kind == "EXECUTE"))).all())
         assert len(queued) == 1 and queued[0].status == "QUEUED"
-        assert queued[0].args["provider_bps"] == 7000
+        # exact amounts, not basis points: this is what both parties signed and what the contract will pay
+        assert queued[0].args["provider_amount"] == 70_000_000
+        assert queued[0].args["customer_amount"] == 30_000_000
         proposal = await disputes.proposal_for(s, dispute_id)
 
-    await handle_log(chain_event("Resolved", ids["tx_key"], {"toProvider": 70_000_000, "toCustomer": 30_000_000,
-                                                             "outcomeHash": proposal.outcome_hash}, index=6))
+    await handle_log(chain_event("IntentResolved", ids["intent_id"],
+                                 {"customerAmount": 30_000_000, "providerAmount": 70_000_000}, index=6))
     async with sessionmaker()() as s:
         tx = await s.get(Transaction, ids["tx"])
         assert tx.state == TxState.SETTLED.value
@@ -251,7 +282,7 @@ async def test_the_dispute_path_settles_seventy_thirty(db, fake_llm):
 
 async def test_a_replayed_log_changes_nothing(db, fake_llm):
     ids = await walk_to_delivered(fake_llm)
-    event = chain_event("Released", ids["tx_key"], {"amount": 100_000_000}, index=7)
+    event = chain_event("IntentResolved", ids["intent_id"], {"customerAmount": 0, "providerAmount": 100_000_000}, index=7)
     await handle_log(event)
     async with sessionmaker()() as s:
         first = await s.get(Transaction, ids["tx"])
@@ -265,13 +296,14 @@ async def test_a_replayed_log_changes_nothing(db, fake_llm):
 
 
 async def test_a_mismatched_funding_event_is_refused(db, fake_llm):
+    """An escrow that holds a different amount than the customer authorised must not move the state."""
     async with session_scope() as s:
         customer, provider_user, provider = await setup_parties(s)
         intent, tx = await intents.capture(s, customer.id, "Paint a 2-bedroom in Surulere",
                                            ParsedIntent(SPEC, None, "fake-llm", "test"))
         quote = await intents.upsert_quote(s, intent, provider.id, provider.display_name, SPEC, 16_500_000,
                                            {"score": 82}, 1)
-        ids = {"customer": customer.id, "tx": tx.id, "quote": quote.id, "provider": provider.id, "tx_key": tx.tx_key}
+        ids = {"customer": customer.id, "tx": tx.id, "quote": quote.id, "provider": provider.id}
     async with session_scope() as s:
         tx = await machine.lock(s, ids["tx"])
         await transactions.select_quote(s, tx, ids["customer"], await intents.quote_view(s, ids["quote"]),
@@ -286,16 +318,20 @@ async def test_a_mismatched_funding_event_is_refused(db, fake_llm):
         await authorization.record(s, tx, ids["customer"], signature, signer, digest, human)
     async with session_scope() as s:
         tx = await machine.lock(s, ids["tx"])
-        _, body = await payments.fund_calls(s, tx, ids["customer"], Account.from_key(PROVIDER_KEY).address)
-        args = body["calls"][1]["args"]
+        await payments.fund_calls(s, tx, ids["customer"], Account.from_key(PROVIDER_KEY).address)
+    create_hash = reported_hash()
+    async with session_scope() as s:
+        tx = await machine.lock(s, ids["tx"])
+        await payments.report_chain_tx(s, tx, ids["customer"], "CREATE_INTENT", create_hash)
 
-    wrong = {"customer": Account.from_key(CUSTOMER_KEY).address.lower(), "provider": args[1].lower(),
-             "amount": int(args[2]) + 1,                                  # someone funded a different amount
-             "authorizationHash": args[3], "disputeWindow": int(args[4]), "expiresAt": int(args[5])}
-    await handle_log(chain_event("JobFunded", ids["tx_key"], wrong, index=8))
+    await handle_log(chain_event("IntentCreated", 99, tx_hash=create_hash,
+                                 args={"customer": Account.from_key(CUSTOMER_KEY).address.lower(),
+                                       "provider": Account.from_key(PROVIDER_KEY).address.lower(),
+                                       "token": get_settings().usdc_address.lower(),
+                                       "amount": 100_000_001}))          # one micro-USDC short of the mandate
     async with sessionmaker()() as s:
         tx = await s.get(Transaction, ids["tx"])
-        assert tx.state == TxState.FUNDING.value          # unchanged: the event did not match what was authorised
+        assert tx.escrow_intent_id is None, "an intent for the wrong amount must not be bound"
+        assert tx.state == TxState.FUNDING.value
         events = (await views.timeline(s, tx))["events"]
         assert events[-1]["event"] == "EVENT_MISMATCH"
-        assert "amount" in events[-1]["payload"]["reason"]

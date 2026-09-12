@@ -28,6 +28,7 @@ from app.domains.intents import service as intents
 from app.domains.payments import resolver
 from app.domains.transactions import machine
 from app.domains.transactions import policy as tx_policy
+from app.integrations.arc import client as arc_client
 from app.integrations.arc import eip712
 
 logger = logging.getLogger("disputes")
@@ -136,16 +137,18 @@ async def file_complaint(s: AsyncSession, tx, customer_id: uuid.UUID, category: 
     dispute = Dispute(transaction_id=tx.id, complaint_id=complaint.id, level="L1", status="OPENING")
     s.add(dispute)
     await s.flush()
-    queued = await resolver.queue_open_dispute(s, tx.id, tx.tx_key, digest)
     await machine.note(s, tx, f"customer:{customer_id}", "HUMAN_CHECK_VERIFIED",
                        {"action": settings.world_action_complaint, "human_check_id": str(check_id)})
-    await machine.note(s, tx, f"customer:{customer_id}", "TX_QUEUED",
-                       {"kind": "OPEN_DISPUTE", "chain_tx_id": queued.id, "complaint_hash": digest,
-                        "complaint_id": str(complaint.id), "dispute_id": str(dispute.id), "category": category})
+    await machine.note(s, tx, f"customer:{customer_id}", "COMPLAINT_FILED",
+                       {"complaint_hash": digest, "complaint_id": str(complaint.id), "dispute_id": str(dispute.id),
+                        "category": category})
+    # The escrow only lets the customer or the provider freeze the money, so the call goes back to her wallet.
+    call = (arc_client.call(get_settings().escrow_address, "raiseDispute", [int(tx.escrow_intent_id)])
+            if tx.escrow_intent_id else None)
     return 202, {"dispute": {"id": str(dispute.id), "status": "OPENING",
                              "response_deadline": utcnow() + timedelta(seconds=settings.response_window_seconds)},
                  "complaint": {"id": str(complaint.id), "complaint_hash": digest},
-                 "transaction": {"id": str(tx.id), "state": tx.state}}
+                 "call": call, "transaction": {"id": str(tx.id), "state": tx.state}}
 
 
 # ---------------------------------------------------------------- response, ladder, proposal
@@ -260,7 +263,9 @@ async def proposal_view(s: AsyncSession, tx, dispute: Dispute) -> dict:
             "outcome_hash": proposal.outcome_hash, "accept_deadline": proposal.accept_deadline, "status": proposal.status,
             "acceptances": [{"role": a.role, "decision": a.decision} for a in acceptances],
             "resolution_typed_data": eip712.for_client(
-                eip712.resolution_typed_data(tx.tx_key, proposal.provider_bps, proposal.outcome_hash)),
+                eip712.resolution_typed_data(tx.escrow_intent_id or 0, proposal.to_customer_minor,
+                                             proposal.to_provider_minor)),
+            "appeal": {"window_hours": 48, "note": "either party may escalate to a human inside the window"},
             "model": proposal.model, "prompt_version": proposal.prompt_version}
 
 
@@ -286,7 +291,10 @@ async def accept(s: AsyncSession, tx, dispute: Dispute, proposal: ResolutionProp
         raise Conflict(f"this proposal is {proposal.status.lower()}", code="proposal_closed")
     if proposal.accept_deadline <= utcnow():
         raise Gone("this proposal has expired", code="proposal_expired")
-    typed = eip712.resolution_typed_data(tx.tx_key, proposal.provider_bps, proposal.outcome_hash)
+    if tx.escrow_intent_id is None:
+        raise Conflict("this job is not on-chain yet", code="not_funded")
+    typed = eip712.resolution_typed_data(tx.escrow_intent_id, proposal.to_customer_minor,
+                                         proposal.to_provider_minor)
     signer = eip712.recover(typed, signature)
     wallet = await identity.wallet_of(s, user_id)
     if wallet is None or signer != wallet.lower():
@@ -303,13 +311,17 @@ async def accept(s: AsyncSession, tx, dispute: Dispute, proposal: ResolutionProp
                             tx_policy.Action(kind="settle", state=tx.state, currency=tx.currency,
                                              amount_minor=int(tx.amount_minor or 0)),
                             tx_policy.context(tx, await authorization.view(s, tx.id)))
-    queued = await resolver.queue_resolve(s, tx.id, tx.tx_key, proposal.provider_bps, proposal.outcome_hash,
-                                          accepted["customer"].signature, accepted["provider"].signature)
+    # Two distinct human signatures. The arbitrator key only relays the transaction; it is not one of the two.
+    queued = await resolver.queue_execute(s, tx.id, tx.escrow_intent_id, proposal.to_customer_minor,
+                                          proposal.to_provider_minor, accepted["customer"].signature,
+                                          accepted["provider"].signature)
     proposal.status = "SETTLING"
     s.add(proposal)
     await machine.note(s, tx, f"{role}:{user_id}", "TX_QUEUED",
-                       {"kind": "RESOLVE", "chain_tx_id": queued.id, "outcome_hash": proposal.outcome_hash})
-    return 200, {"acceptances": sorted(accepted), "status": "SETTLING", "pending_tx": "RESOLVE"}
+                       {"kind": "EXECUTE", "chain_tx_id": queued.id, "outcome_hash": proposal.outcome_hash,
+                        "to_provider_minor": proposal.to_provider_minor,
+                        "to_customer_minor": proposal.to_customer_minor})
+    return 200, {"acceptances": sorted(accepted), "status": "SETTLING", "pending_tx": "EXECUTE"}
 
 
 async def reject(s: AsyncSession, tx, dispute: Dispute, proposal: ResolutionProposal, user_id: uuid.UUID, role: str,
@@ -384,3 +396,43 @@ async def expire_proposal(s: AsyncSession, proposal_id: uuid.UUID, dispute_id: u
     if dispute is not None:
         dispute.status, dispute.updated_at = "ESCALATED", utcnow()
         s.add(dispute)
+
+
+# ---------------------------------------------------------------- the contract's own dispute clock
+
+async def mark_timelocked(s: AsyncSession, transaction_id: uuid.UUID, proposed_at) -> None:
+    """The arbitrator's proposal is on-chain: 48 hours in which either party can escalate it to a human."""
+    dispute = await for_transaction(s, transaction_id)
+    if dispute is None:
+        return
+    dispute.status, dispute.updated_at = "TIMELOCKED", utcnow()
+    s.add(dispute)
+    proposal = await proposal_for(s, dispute.id)
+    if proposal is not None:
+        proposal.status = "TIMELOCKED"
+        proposal.accept_deadline = proposed_at + timedelta(hours=48)   # the contract's appeal window
+        s.add(proposal)
+
+
+async def mark_appealed(s: AsyncSession, transaction_id: uuid.UUID, appellant: str | None, stake: int) -> None:
+    """Someone paid to send this to a person. The money stays frozen until the owner resolves it."""
+    dispute = await for_transaction(s, transaction_id)
+    if dispute is None:
+        return
+    dispute.status, dispute.updated_at = "APPEALED", utcnow()
+    s.add(dispute)
+    proposal = await proposal_for(s, dispute.id)
+    if proposal is not None:
+        proposal.status = "APPEALED"
+        s.add(proposal)
+
+
+async def queue_ai_proposal(s: AsyncSession, tx) -> None:
+    """Put the proposal on-chain so the appeal window starts. Execution still needs two signatures."""
+    proposal = await settlement_view(s, tx.id)
+    if proposal is None or tx.escrow_intent_id is None:
+        return
+    queued = await resolver.queue_ai_proposal(s, tx.id, tx.escrow_intent_id, proposal["to_customer_minor"],
+                                              proposal["to_provider_minor"])
+    await machine.note(s, tx, "system:ladder", "TX_QUEUED",
+                       {"kind": "AI_PROPOSAL", "chain_tx_id": queued.id, "escrow_intent_id": tx.escrow_intent_id})

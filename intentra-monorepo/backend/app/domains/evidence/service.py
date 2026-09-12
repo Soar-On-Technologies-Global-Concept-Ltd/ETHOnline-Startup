@@ -12,8 +12,6 @@ from app.core.errors import Forbidden, Unprocessable
 from app.core.logging import log
 from app.domains.evidence.models import Evidence
 from app.domains.transactions.models import Transaction
-from app.domains.payments import resolver
-from app.integrations.arc import client as arc_client
 from app.domains.evidence.sanitize import sanitize
 from app.integrations.storage import LocalStorage, storage
 from app.domains.transactions import machine
@@ -66,15 +64,12 @@ async def record(s: AsyncSession, tx: Transaction, user_id: uuid.UUID, role: str
                    sha256=file.sha256, storage_uri=file.storage_uri, mime=file.mime, bytes=file.size, caption=caption)
     s.add(row)
     await s.flush()
-    queued = await resolver.queue_anchor(s, tx.id, tx.tx_key, file.sha256)
-    row.anchor_tx_id = queued.id
-    s.add(row)
     payload = {"evidence_id": str(row.id), "kind": kind.value, "scope_item": scope_item, "sha256": file.sha256}
     if kind is EvidenceKind.AFTER_PHOTO and tx.state == TxState.IN_PROGRESS.value:
         await machine.apply(s, tx, Event.EVIDENCE_ADDED, f"provider:{user_id}", payload)
     else:
         await machine.note(s, tx, f"{role}:{user_id}", "EVIDENCE_ADDED", payload)
-    log(logger, "evidence stored", kind=kind.value, scope_item=scope_item, sha256=file.sha256, anchor_id=queued.id)
+    log(logger, "evidence stored", kind=kind.value, scope_item=scope_item, sha256=file.sha256)
     return row, True
 
 
@@ -93,25 +88,14 @@ async def visible(items: list[Evidence]) -> list[dict]:
         out.append({"id": str(e.id), "kind": e.kind, "role": e.role, "scope_item": e.scope_item, "caption": e.caption,
                     "sha256": e.sha256, "mime": e.mime, "bytes": e.bytes, "created_at": e.created_at,
                     "url": await storage().signed_url(e.storage_uri),
-                    "anchored_tx_url": arc_client.explorer_tx(e.anchored_tx),
-                    "anchoring": "ANCHORED" if e.anchored_tx else "QUEUED"})
+                    # The canonical escrow has no anchor call, so the hash is proven by the audit chain, not a log.
+                    "anchoring": "OFF_CHAIN"})
     return out
 
 
 def missing_items(checklist: list[str], items: list[Evidence]) -> list[str]:
     covered = {e.scope_item for e in items if e.kind == EvidenceKind.AFTER_PHOTO.value and e.scope_item}
     return [item for item in checklist if item not in covered]
-
-
-async def mark_anchored(s: AsyncSession, transaction_id: uuid.UUID, evidence_hash: str, tx_hash: str) -> bool:
-    """The escrow published the hash: link the proof. Returns False if the hash is not evidence of this transaction."""
-    row = (await s.exec(select(Evidence).where(Evidence.transaction_id == transaction_id,
-                                               Evidence.sha256 == evidence_hash.lower()))).one_or_none()
-    if row is None:
-        return False
-    row.anchored_tx = tx_hash
-    s.add(row)
-    return True
 
 
 def read_signed_file(key: str, exp: int, sig: str) -> bytes | None:
@@ -122,16 +106,3 @@ def read_signed_file(key: str, exp: int, sig: str) -> bytes | None:
     return store.read_verified(key, exp, sig)
 
 
-async def unanchored(s: AsyncSession, transaction_id: uuid.UUID | None = None) -> list[Evidence]:
-    """Stored, hashed, but not yet proven on-chain."""
-    query = select(Evidence).where(Evidence.anchored_tx.is_(None), Evidence.anchor_tx_id.is_not(None))
-    if transaction_id is not None:
-        query = query.where(Evidence.transaction_id == transaction_id)
-    return list((await s.exec(query)).all())
-
-
-async def set_anchor_tx(s: AsyncSession, evidence_id: uuid.UUID, chain_tx_id: int) -> None:
-    row = await s.get(Evidence, evidence_id)
-    if row is not None:
-        row.anchor_tx_id = chain_tx_id
-        s.add(row)
