@@ -1,8 +1,8 @@
 // Intentra Contract Exports
 // Generated for Frontend and Backend Integration
 
-export const INTENTRA_ESCROW_ADDRESS = "0x0000000000000000000000000000000000000000"; // TODO: Update after deployment
-export const MOCK_USDC_ADDRESS = "0x0000000000000000000000000000000000000000"; // TODO: Update after deployment
+export const INTENTRA_ESCROW_ADDRESS = "0xeF3a099CC877F6e274b037847A6ee44C4d62648D"; // Live on Arc Testnet
+export const MOCK_USDC_ADDRESS = "0xFa5a5744898B71c93fF80F179d95184864143190"; // Live on Arc Testnet
 
 export const IntentraEscrowABI = [
   {
