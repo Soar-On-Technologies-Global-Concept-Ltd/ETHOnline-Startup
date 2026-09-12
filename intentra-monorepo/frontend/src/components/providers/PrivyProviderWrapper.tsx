@@ -44,6 +44,11 @@ export function PrivyProviderWrapper({ children }: { children: React.ReactNode }
             createOnLogin: "users-without-wallets",
           },
         },
+        fundingMethodConfig: {
+          moonpay: {
+            useSandbox: true,
+          },
+        },
       }}
     >
       {children}

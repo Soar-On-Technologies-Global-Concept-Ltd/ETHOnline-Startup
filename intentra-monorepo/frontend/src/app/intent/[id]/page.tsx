@@ -72,8 +72,8 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
         const domain = {
           name: "Intentra Protocol",
           version: "1",
-          chainId: 50, // Arc Testnet
-          verifyingContract: "0x1234567890abcdef1234567890abcdef12345678" as `0x${string}`,
+          chainId: process.env.NEXT_PUBLIC_ARC_CHAIN_ID ? parseInt(process.env.NEXT_PUBLIC_ARC_CHAIN_ID) : 5042002, // Arc Testnet
+          verifyingContract: (process.env.NEXT_PUBLIC_ESCROW_ADDRESS || "0xeF3a099CC877F6e274b037847A6ee44C4d62648D") as `0x${string}`,
         };
 
         const types = {
@@ -96,6 +96,16 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
         await signTypedData({ domain, types, primaryType: "IntentMandate", message });
       }
 
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
+      const mockTxHash = "0x" + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+      
+      const response = await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tx_hash: mockTxHash }),
+      });
+      if (!response.ok) throw new Error("Backend failed to lock escrow");
+
       setStep('paid');
       toast.success(`Mandate Signed & $${intent?.maxUsd || 150} USDC Locked in Arc Escrow!`);
     } catch (err: unknown) {
@@ -104,9 +114,8 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
         toast.error("Signature cancelled by user");
         return;
       }
-      console.warn("Dev mode signature handoff", err);
-      setStep('paid');
-      toast.success(`Mandate Signed & $${intent?.maxUsd || 150} USDC Locked in Arc Escrow!`);
+      console.warn("Signature error:", err);
+      toast.error("Failed to sign and fund. See console.");
     }
   };
 
@@ -115,16 +124,49 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
     setStep('evidence_submitted');
   };
 
-  const handleDisputeSubmitted = (complaint: string) => {
-    setStep('disputed');
-    setDisputeResolution({
-      splitCustomer: 70,
-      splitProvider: 30,
-      customerUsd: Math.round((intent?.maxUsd || 150) * 0.7),
-      providerUsd: Math.round((intent?.maxUsd || 150) * 0.3),
-      rationale: `L2 Vision analysis of complaint "${complaint}" confirms partial delivery. Proposed 70/30 split based on anchored evidence.`
-    });
-    toast.warning("Dispute opened! AI L2 Arbitrator generated 70/30 resolution.");
+  const handleDisputeSubmitted = async (complaint: string) => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
+      const response = await fetch(`${baseUrl}/transactions/${intentId}/complaint`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: "incomplete",
+          text: complaint,
+          evidence_ids: [],
+          idkit_result: { merkle_root: "mock", nullifier_hash: "mock", proof: "mock", verification_level: "orb" }
+        })
+      });
+      
+      if (!response.ok) throw new Error("Backend failed to file dispute");
+      
+      setStep('disputed');
+      toast.info("Dispute opened! Waiting for AI L2 Arbitrator...");
+      
+      // Simulate polling by just fetching the transaction in a loop
+      const pollInterval = setInterval(async () => {
+        const res = await fetch(`${baseUrl}/transactions/${intentId}`);
+        if (res.ok) {
+          const txData = await res.json();
+          if (txData.state === "resolved" || txData.state === "disputed") {
+            // For hackathon, if backend doesn't resolve instantly, we fallback to a mock resolution after a delay
+            // If the backend has a real resolution, parse it.
+            clearInterval(pollInterval);
+            setStep('disputed'); // keep it as disputed until user accepts
+            setDisputeResolution(txData.resolution || {
+              splitCustomer: 70,
+              splitProvider: 30,
+              customerUsd: Math.round((intent?.maxUsd || 150) * 0.7),
+              providerUsd: Math.round((intent?.maxUsd || 150) * 0.3),
+              rationale: `L2 Vision analysis of complaint "${complaint}" confirms partial delivery. Proposed 70/30 split based on anchored evidence.`
+            });
+            toast.warning("AI L2 Arbitrator generated resolution.");
+          }
+        }
+      }, 3000);
+    } catch (e) {
+      toast.error("Failed to file dispute with backend");
+    }
   };
 
   const handleSignResolution = async () => {
@@ -133,8 +175,8 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
         const domain = {
           name: "Intentra Protocol",
           version: "1",
-          chainId: 50, // Arc Testnet
-          verifyingContract: "0x1234567890abcdef1234567890abcdef12345678" as `0x${string}`,
+          chainId: process.env.NEXT_PUBLIC_ARC_CHAIN_ID ? parseInt(process.env.NEXT_PUBLIC_ARC_CHAIN_ID) : 5042002, // Arc Testnet
+          verifyingContract: (process.env.NEXT_PUBLIC_ESCROW_ADDRESS || "0xeF3a099CC877F6e274b037847A6ee44C4d62648D") as `0x${string}`,
         };
 
         const types = {
@@ -152,7 +194,15 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
         };
 
         toast.info(`Accepting AI Resolution for ${role}...`);
-        await signTypedData({ domain, types, primaryType: "IntentResolution", message });
+        const sig = await signTypedData({ domain, types, primaryType: "IntentResolution", message });
+        
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
+        const response = await fetch(`${baseUrl}/transactions/${intentId}/release`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ signature: sig }),
+        });
+        if (!response.ok) throw new Error("Backend rejected signature");
       }
 
       setStep('resolved');
@@ -163,9 +213,8 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
         toast.error("Signature cancelled by user");
         return;
       }
-      console.warn("Dev mode signature handoff", err);
-      setStep('resolved');
-      toast.success("Resolution signed! Arc Smart Contract executed split refund.");
+      console.warn("Signature error:", err);
+      toast.error("Failed to process resolution signature.");
     }
   };
 
@@ -185,7 +234,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
   return (
     <main className="max-w-3xl mx-auto p-4 md:p-10 min-h-screen pb-24 font-sans">
       {/* Navigation Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+      <div className="flex flex-row items-center justify-between gap-4 mb-12 w-full">
         <Link href="/dashboard/consumer" className="inline-flex items-center gap-2 text-xs font-mono text-white/50 hover:text-white transition-colors w-fit">
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Studio</span>
@@ -323,7 +372,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
           )}
 
           {role === 'provider' && step === 'paid' && (
-            <EvidenceUploader onEvidenceSubmitted={handleEvidenceSubmitted} />
+            <EvidenceUploader intentId={intentId} onEvidenceSubmitted={handleEvidenceSubmitted} />
           )}
 
           {/* Step 3: Reusable DisputeResolver */}

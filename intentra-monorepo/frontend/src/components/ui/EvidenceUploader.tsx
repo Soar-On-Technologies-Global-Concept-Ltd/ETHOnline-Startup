@@ -7,10 +7,11 @@ import { FiUpload as Upload } from "react-icons/fi";
 import { toast } from "sonner";
 
 interface EvidenceUploaderProps {
+  intentId: string;
   onEvidenceSubmitted: (hash: string) => void;
 }
 
-export function EvidenceUploader({ onEvidenceSubmitted }: EvidenceUploaderProps) {
+export function EvidenceUploader({ intentId, onEvidenceSubmitted }: EvidenceUploaderProps) {
   const [isUploading, setIsUploading] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
 
@@ -20,19 +21,37 @@ export function EvidenceUploader({ onEvidenceSubmitted }: EvidenceUploaderProps)
     }
   };
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!selectedFile) {
       toast.error("Please select a file first.");
       return;
     }
     
     setIsUploading(true);
-    setTimeout(() => {
-      const mockHash = "0x" + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
-      setIsUploading(false);
-      onEvidenceSubmitted(mockHash);
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("kind", "AFTER_PHOTO");
+      
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
+      const response = await fetch(`${baseUrl}/evidence/transactions/${intentId}/evidence`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload evidence");
+      }
+
+      const data = await response.json();
+      onEvidenceSubmitted(data.evidence.sha256 || data.evidence.id);
       toast.success("Work evidence photo hashed (SHA-256) and anchored on Arc testnet!");
-    }, 800);
+    } catch (error) {
+      console.error(error);
+      toast.error("Error anchoring evidence");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useFundWallet } from "@privy-io/react-auth";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import {
   FiLogOut,
@@ -11,6 +11,7 @@ import {
   FiCheck,
   FiUser,
   FiExternalLink,
+  FiPlus as Plus,
 } from "react-icons/fi";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -25,6 +26,7 @@ export function PrivyLoginButton({
   variant = "glass",
 }: PrivyLoginButtonProps) {
   const { login, logout, ready, authenticated, user } = usePrivy();
+  const { fundWallet } = useFundWallet();
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -64,6 +66,21 @@ export function PrivyLoginButton({
     }
   };
 
+  const handleTopUp = async () => {
+    if (!address) return;
+    try {
+      await fundWallet({ address });
+    } catch (err: unknown) {
+      console.error("Funding error:", err);
+      const msg = (err as Error)?.message || "";
+      if (msg.includes("Wallet funding is not enabled")) {
+        toast.info("Funding is disabled. Please copy your address and use the Arc Testnet faucet to top up.");
+      } else {
+        toast.error("Failed to open funding flow. Please fund manually via faucet.");
+      }
+    }
+  };
+
   if (!ready) {
     return (
       <PrimaryButton variant={variant} className={className} disabled>
@@ -74,8 +91,21 @@ export function PrivyLoginButton({
 
   if (authenticated) {
     return (
-      <div className="relative inline-block text-left" ref={dropdownRef}>
-        {/* Wallet Trigger Pill */}
+      <div className="flex items-center gap-2" ref={dropdownRef}>
+        {address && (
+          <button
+            type="button"
+            onClick={handleTopUp}
+            title="Fund Embedded Wallet"
+            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-success/10 hover:bg-success/20 text-success border border-success/20 transition-all cursor-pointer text-xs font-mono font-bold"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Top Up</span>
+          </button>
+        )}
+        
+        <div className="relative inline-block text-left">
+
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
@@ -169,6 +199,7 @@ export function PrivyLoginButton({
             </button>
           </div>
         )}
+        </div>
       </div>
     );
   }
