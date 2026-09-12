@@ -33,7 +33,7 @@ async def claim_for_user(s: AsyncSession, user_id: uuid.UUID, email: str | None)
     linked = await for_user(s, user_id)
     if linked is not None or not email:
         return linked
-    unlinked = (await s.exec(select(Provider).where(Provider.email == email, Provider.user_id.is_(None)))).one_or_none()
+    unlinked = (await s.exec(select(Provider).where(Provider.email == email, Provider.user_id == None))).one_or_none()
     if unlinked is None:
         return None
     unlinked.user_id = user_id

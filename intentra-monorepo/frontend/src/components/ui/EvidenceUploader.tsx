@@ -1,50 +1,90 @@
 "use client";
 
 import * as React from "react";
-import { SolidCard } from "@/components/ui/SolidCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { FiUpload as Upload } from "react-icons/fi";
 import { toast } from "sonner";
 
 interface EvidenceUploaderProps {
+  intentId: string;
   onEvidenceSubmitted: (hash: string) => void;
 }
 
-export function EvidenceUploader({ onEvidenceSubmitted }: EvidenceUploaderProps) {
+export function EvidenceUploader({ intentId, onEvidenceSubmitted }: EvidenceUploaderProps) {
   const [isUploading, setIsUploading] = React.useState(false);
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
 
-  const handleUpload = () => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      toast.error("Please select a file first.");
+      return;
+    }
+    
     setIsUploading(true);
-    setTimeout(() => {
-      const mockHash = "0x" + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
-      setIsUploading(false);
-      onEvidenceSubmitted(mockHash);
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("kind", "AFTER_PHOTO");
+      
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
+      const response = await fetch(`${baseUrl}/evidence/transactions/${intentId}/evidence`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload evidence");
+      }
+
+      const data = await response.json();
+      onEvidenceSubmitted(data.evidence.sha256 || data.evidence.id);
       toast.success("Work evidence photo hashed (SHA-256) and anchored on Arc testnet!");
-    }, 800);
+    } catch (error) {
+      console.error(error);
+      toast.error("Error anchoring evidence");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
-    <SolidCard variant="glass" className="p-6 rounded-lg">
-      <h3 className="font-display font-bold text-lg mb-1">Provider Evidence Dropzone</h3>
-      <p className="text-xs text-text-muted font-mono mb-5">
-        Upload completion photos. Intentra will generate a SHA-256 evidence hash to anchor on Arc.
+    <div className="p-8 text-center border border-white/10 bg-white/[0.02] rounded-2xl">
+      <h3 className="font-display font-medium text-xl mb-2 text-white">Provider Evidence Dropzone</h3>
+      <p className="text-xs text-white/50 font-mono mb-6 max-w-md mx-auto">
+        Upload completion photos. Intentra will generate a SHA-256 evidence hash to anchor on Arc Escrow.
       </p>
 
-      <div className="p-8 border border-dashed border-white/20 rounded-md text-center bg-white/5 mb-5 cursor-pointer hover:bg-white/[0.08] transition-all" onClick={handleUpload}>
-        <Upload className="w-6 h-6 text-text-muted mx-auto mb-2" />
-        <span className="text-xs font-mono text-text-muted block">Drag event photos here or click to select</span>
-      </div>
+      <label className="block p-8 border border-dashed border-white/20 rounded-xl text-center bg-transparent mb-6 cursor-pointer hover:border-white/40 transition-all max-w-md mx-auto">
+        <input 
+          type="file" 
+          accept="image/*,video/*" 
+          className="hidden" 
+          onChange={handleFileChange}
+        />
+        <Upload className="w-6 h-6 text-white/30 mx-auto mb-3" />
+        {selectedFile ? (
+          <span className="text-xs font-mono text-white block truncate px-4">{selectedFile.name}</span>
+        ) : (
+          <span className="text-xs font-mono text-white/40 block">Click to browse or drag & drop</span>
+        )}
+      </label>
 
-      <PrimaryButton onClick={handleUpload} disabled={isUploading} className="w-full py-2.5 text-xs flex items-center justify-center gap-2">
+      <PrimaryButton onClick={handleUpload} disabled={isUploading || !selectedFile} className="w-full sm:w-auto px-8 py-3 text-xs tracking-wide mx-auto flex items-center justify-center gap-2">
         {isUploading ? (
           <span>Generating SHA-256 Evidence Hash...</span>
         ) : (
           <>
             <Upload className="w-3.5 h-3.5" />
-            <span>Hash Photo & Anchor Evidence on Arc</span>
+            <span>Hash Photo & Anchor Evidence</span>
           </>
         )}
       </PrimaryButton>
-    </SolidCard>
+    </div>
   );
 }

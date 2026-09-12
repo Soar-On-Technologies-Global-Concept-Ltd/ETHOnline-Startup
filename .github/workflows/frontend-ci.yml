@@ -1,0 +1,42 @@
+name: Frontend CI Checks
+
+on:
+  push:
+    branches: [ main, staging, frontend-mvp ]
+  pull_request:
+    branches: [ main, staging, frontend-mvp ]
+
+jobs:
+  frontend-ci:
+    name: Lint, Typecheck & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Frontend Dependencies
+        working-directory: intentra-monorepo/frontend
+        run: bun install
+
+      - name: Run ESLint
+        working-directory: intentra-monorepo/frontend
+        run: bun run lint
+
+      - name: Run TypeScript Typecheck
+        working-directory: intentra-monorepo/frontend
+        run: bun run typecheck
+
+      - name: Build Frontend Production Bundle
+        working-directory: intentra-monorepo/frontend
+        run: bun run build
+        env:
+          NEXT_PUBLIC_PRIVY_APP_ID: "cmtydyzhk00xz0clbr784n16l"
+          NEXT_PUBLIC_WORLD_ID_APP_ID: "app_staging_default"
+          NEXT_PUBLIC_WORLD_ID_RP_ID: "rp_staging_default"
+          NEXT_PUBLIC_API_URL: "http://localhost:8000"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { SolidCard } from "@/components/ui/SolidCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { TrustScoreBadge } from "@/components/ui/TrustScoreBadge";

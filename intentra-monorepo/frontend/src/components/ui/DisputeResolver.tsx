@@ -3,6 +3,8 @@
 import * as React from "react";
 import { SolidCard } from "@/components/ui/SolidCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { VerifyHumanityWidget } from "@/components/worldcoin/VerifyHumanityWidget";
+import { useIntentStore } from "@/store/intentStore";
 import { toast } from "sonner";
 
 interface DisputeResolverProps {
@@ -13,10 +15,15 @@ interface DisputeResolverProps {
 
 export function DisputeResolver({ evidenceHash, onDisputeSubmitted, onConfirmWork }: DisputeResolverProps) {
   const [complaint, setComplaint] = React.useState("");
+  const isVerified = useIntentStore(state => state.isVerified);
 
   const handleFileDispute = () => {
     if (!complaint.trim()) {
       toast.error("Please describe your complaint");
+      return;
+    }
+    if (!isVerified) {
+      toast.error("You must pass the World ID Selfie Check to file a dispute.");
       return;
     }
     onDisputeSubmitted(complaint);
@@ -29,7 +36,7 @@ export function DisputeResolver({ evidenceHash, onDisputeSubmitted, onConfirmWor
           <h3 className="font-display font-bold text-base">Work Evidence Submitted</h3>
           <p className="text-xs text-text-muted font-mono mt-0.5">SHA-256 Hash: {evidenceHash}</p>
         </div>
-        <span className="text-xs font-mono bg-success/20 text-success border border-success/30 px-2.5 py-0.5 rounded-sm">
+        <span className="text-xs font-mono bg-transparent text-success border border-success/50 px-2.5 py-0.5 rounded-sm">
           Anchored on Arc
         </span>
       </div>
@@ -41,12 +48,18 @@ export function DisputeResolver({ evidenceHash, onDisputeSubmitted, onConfirmWor
           value={complaint}
           onChange={(e) => setComplaint(e.target.value)}
           placeholder="e.g. Photographer left 2 hours early; only 50 event photos delivered..."
-          className="w-full bg-black/40 border border-white/10 rounded-md p-2.5 text-xs text-foreground focus:outline-none font-sans"
+          className="w-full bg-black/40 border border-white/10 rounded-md p-2.5 text-xs text-foreground focus:outline-none font-sans mb-3"
         />
+        
+        {!isVerified && (
+          <div className="pt-2 border-t border-white/10">
+            <VerifyHumanityWidget action="dispute-escrow" buttonText="Complete Selfie Check to File Dispute" />
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 justify-end">
-        <PrimaryButton variant="danger" onClick={handleFileDispute} className="px-5 py-2 text-xs">
+        <PrimaryButton variant="danger" onClick={handleFileDispute} disabled={!isVerified} className="px-5 py-2 text-xs">
           File Complaint & Dispute
         </PrimaryButton>
 

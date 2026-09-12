@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { parseAndCreateIntent, Intent } from "@/lib/api";
 
 export default function ConsumerDashboard() {
-  const { ready, authenticated, user, getAccessToken } = usePrivy();
+  const { ready, authenticated, getAccessToken } = usePrivy();
   const router = useRouter();
 
   const [prompt, setPrompt] = useState("Find a verified photographer for my event, max $150.");
@@ -41,8 +41,24 @@ export default function ConsumerDashboard() {
   };
 
   useEffect(() => {
-    handleAnalyzeIntent(prompt);
-  }, []);
+    let ignore = false;
+    async function initAnalysis() {
+      setIsAnalyzing(true);
+      try {
+        const token = await getAccessToken();
+        const result = await parseAndCreateIntent(prompt, token || "");
+        if (!ignore) setIntent(result);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (!ignore) setIsAnalyzing(false);
+      }
+    }
+    initAnalysis();
+    return () => {
+      ignore = true;
+    };
+  }, [prompt, getAccessToken]);
 
   if (!ready || !authenticated) {
     return (
@@ -62,10 +78,6 @@ export default function ConsumerDashboard() {
         <div>
           <span className="text-xs font-mono uppercase tracking-widest text-text-muted font-medium">Seeker Studio</span>
           <h1 className="font-display text-2xl md:text-3xl font-bold tracking-tight mt-1">Intent & Scope Engine</h1>
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-white/5 border border-white/10 text-xs font-mono">
-          <span className="w-1.5 h-1.5 rounded-full bg-success" />
-          <span className="text-text-muted">{user?.email?.address || "Privy User"}</span>
         </div>
       </header>
 
@@ -157,7 +169,7 @@ export default function ConsumerDashboard() {
                 </div>
                 <div>
                   <span className="text-text-muted block mb-0.5">Policy Gate</span>
-                  <span className="text-xs px-2 py-0.5 rounded-sm bg-success/20 text-success border border-success/30">Privy Mandate Bound</span>
+                  <span className="text-xs px-2 py-0.5 rounded-sm bg-transparent text-success border border-success/50">Privy Mandate Bound</span>
                 </div>
               </div>
             </SolidCard>

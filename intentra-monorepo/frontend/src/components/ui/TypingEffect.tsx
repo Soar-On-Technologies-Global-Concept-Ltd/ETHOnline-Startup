@@ -6,12 +6,9 @@ export function TypingEffect({ text, speed = 20 }: { text: string; speed?: numbe
 
   useEffect(() => {
     let i = 0;
-    setDisplayedText("");
     const timer = setInterval(() => {
-      if (i < text.length) {
-        // Need to use functional update but reference closure variable i 
-        // because React state updates might batch.
-        setDisplayedText(text.slice(0, i + 1));
+      if (i <= text.length) {
+        setDisplayedText(text.slice(0, i));
         i++;
       } else {
         clearInterval(timer);

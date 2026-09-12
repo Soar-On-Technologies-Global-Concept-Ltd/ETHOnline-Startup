@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { IDKitRequestWidget, orbLegacy, type RpContext } from "@worldcoin/idkit";
+import { IDKitRequestWidget, deviceLegacy, type RpContext, type IDKitResult } from "@worldcoin/idkit";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { toast } from "sonner";
 import { useIntentStore } from "@/store/intentStore";
+import { FiCheck, FiShield } from "react-icons/fi";
 
 interface VerifyHumanityWidgetProps {
   action: string;
@@ -14,7 +15,7 @@ interface VerifyHumanityWidgetProps {
 
 export function VerifyHumanityWidget({ 
   action, 
-  buttonText = "Verify Humanity (World Selfie Check)",
+  buttonText = "Verify Humanity (World SDK)",
   onVerified 
 }: VerifyHumanityWidgetProps) {
   const [rpContext, setRpContext] = useState<RpContext | null>(null);
@@ -31,7 +32,7 @@ export function VerifyHumanityWidget({
           body: JSON.stringify({ action }),
         }).then((r) => r.json());
 
-        if (rpSig.error) {
+        if (rpSig?.error) {
           console.error("RP Signature error:", rpSig.error);
           return;
         }
@@ -50,7 +51,7 @@ export function VerifyHumanityWidget({
     fetchSig();
   }, [action]);
 
-  const handleVerify = async (result: any) => {
+  const handleVerify = async (result: IDKitResult) => {
     const response = await fetch("/api/verify-proof", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -61,12 +62,12 @@ export function VerifyHumanityWidget({
     });
 
     if (!response.ok) {
-      throw new Error("Backend verification failed");
+      throw new Error("Backend ZK proof verification failed");
     }
   };
 
   const onSuccess = () => {
-    toast.success("World Selfie Check Verified!");
+    toast.success("World ID Verified!");
     setVerified(true);
     if (onVerified) onVerified();
   };
@@ -80,7 +81,7 @@ export function VerifyHumanityWidget({
       setOpen(true);
     } else {
       // Dev Sandbox mode: auto-verify on click so it works out of the box without requiring external API keys
-      toast.success("World Selfie Check Verified (Dev Sandbox Mode)");
+      toast.success("World ID Verified (Dev Sandbox Mode)");
       setVerified(true);
       if (onVerified) onVerified();
     }
@@ -88,16 +89,20 @@ export function VerifyHumanityWidget({
 
   if (isVerified) {
     return (
-      <div className="flex items-center justify-center gap-2 p-2.5 bg-success/10 border border-success/30 rounded-md text-success font-medium text-xs">
-        <span>✓ Verified Human (World ID)</span>
+      <div className="flex items-center justify-center gap-2 p-2.5 bg-success/10 border border-success/30 rounded-md text-success font-medium text-xs font-mono">
+        <FiCheck className="w-4 h-4" />
+        <span>Verified Human (World ID)</span>
       </div>
     );
   }
 
   return (
     <div className="space-y-2">
-      <PrimaryButton onClick={handleClick} className="w-full text-xs py-2.5">
-        {buttonText}
+      <PrimaryButton onClick={handleClick} className="w-full text-xs py-2.5 justify-center">
+        <span className="flex items-center gap-2">
+          <FiShield className="w-3.5 h-3.5 text-primary" />
+          <span>{buttonText}</span>
+        </span>
       </PrimaryButton>
 
       {hasRealWorldAppId && rpContext && (
@@ -108,7 +113,7 @@ export function VerifyHumanityWidget({
           action={action}
           rp_context={rpContext}
           allow_legacy_proofs={true}
-          preset={orbLegacy()}
+          preset={deviceLegacy()}
           handleVerify={handleVerify}
           onSuccess={onSuccess}
         />
