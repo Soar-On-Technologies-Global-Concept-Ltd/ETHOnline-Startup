@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Exo_2 } from "next/font/google";
 import { Toaster } from "sonner";
 import { PrivyProviderWrapper } from "@/components/providers/PrivyProviderWrapper";
+import { AppShell } from "@/components/layout/AppShell";
 import "./globals.css";
 
 const exo2 = Exo_2({ 
@@ -24,7 +25,9 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={`${exo2.variable} font-sans antialiased bg-background text-foreground min-h-screen`}>
         <PrivyProviderWrapper>
-          {children}
+          <AppShell>
+            {children}
+          </AppShell>
           <Toaster theme="dark" position="bottom-right" />
         </PrivyProviderWrapper>
       </body>

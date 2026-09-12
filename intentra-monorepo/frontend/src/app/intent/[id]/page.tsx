@@ -1,24 +1,31 @@
 "use client";
 
+import { useState, useEffect, use } from "react";
 import { SolidCard } from "@/components/ui/SolidCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { TrustScoreBadge } from "@/components/ui/TrustScoreBadge";
+import { TransactionTimeline, TimelineStep } from "@/components/ui/TransactionTimeline";
+import { EvidenceUploader } from "@/components/ui/EvidenceUploader";
+import { DisputeResolver } from "@/components/ui/DisputeResolver";
 import { VerifyHumanityWidget } from "@/components/worldcoin/VerifyHumanityWidget";
-import { ArrowLeft, Upload, Lock } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { useIntentStore } from "@/store/intentStore";
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { fetchIntentById, Intent } from "@/lib/api";
 
-export default function IntentTransactionPage() {
+export default function IntentTransactionPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
+  const intentId = resolvedParams.id;
+
   const [role, setRole] = useState<'customer' | 'provider'>('customer');
-  const [trustScore, setTrustScore] = useState(0);
-  const [step, setStep] = useState<'pending' | 'authorized' | 'paid' | 'evidence_submitted' | 'disputed' | 'resolved'>('pending');
+  const [intent, setIntent] = useState<Intent | null>(null);
+  const [step, setStep] = useState<TimelineStep>('pending');
   const [evidenceHash, setEvidenceHash] = useState<string | null>(null);
-  const [disputeReason, setDisputeReason] = useState("");
   const [disputeResolution, setDisputeResolution] = useState<any>(null);
 
   const isVerified = useIntentStore(state => state.isVerified);
@@ -32,11 +39,12 @@ export default function IntentTransactionPage() {
   }, [ready, authenticated, router]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setTrustScore(98);
-    }, 400);
-    return () => clearTimeout(timer);
-  }, []);
+    async function loadIntent() {
+      const data = await fetchIntentById(intentId);
+      setIntent(data);
+    }
+    loadIntent();
+  }, [intentId]);
 
   const handleSignMandateAndLock = async () => {
     try {
@@ -58,9 +66,9 @@ export default function IntentTransactionPage() {
         };
 
         const message = {
-          service: "Event Photography",
-          provider: "0xa1b2c3d4e5f6789012345678901234567890abcd" as `0x${string}`,
-          maxUsd: BigInt(150),
+          service: intent?.service || "Event Photography",
+          provider: (intent?.providers?.[0]?.address || "0xa1b2c3d4e5f6789012345678901234567890abcd") as `0x${string}`,
+          maxUsd: BigInt(intent?.maxUsd || 150),
           nonce: BigInt(1),
         };
 
@@ -69,52 +77,52 @@ export default function IntentTransactionPage() {
       }
 
       setStep('paid');
-      toast.success("Mandate Signed & $150 USDC Locked in Arc Escrow!");
-    } catch (err) {
-      console.warn("User cancelled signature or dev mode", err);
+      toast.success(`Mandate Signed & $${intent?.maxUsd || 150} USDC Locked in Arc Escrow!`);
+    } catch (err: any) {
+      if (err?.message?.includes("User rejected") || err?.code === 4001) {
+        toast.error("Signature cancelled by user");
+        return;
+      }
+      console.warn("Dev mode signature handoff", err);
       setStep('paid');
-      toast.success("Mandate Signed & $150 USDC Locked in Arc Escrow!");
+      toast.success(`Mandate Signed & $${intent?.maxUsd || 150} USDC Locked in Arc Escrow!`);
     }
   };
 
-  const handleUploadEvidence = () => {
-    const mockHash = "0x" + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
-    setEvidenceHash(mockHash);
+  const handleEvidenceSubmitted = (hash: string) => {
+    setEvidenceHash(hash);
     setStep('evidence_submitted');
-    toast.success("Work evidence photo hashed (SHA-256) and anchored on Arc testnet!");
   };
 
-  const handleFileDispute = () => {
-    if (!disputeReason.trim()) {
-      toast.error("Please describe your complaint");
-      return;
-    }
+  const handleDisputeSubmitted = (complaint: string) => {
     setStep('disputed');
     setDisputeResolution({
       splitCustomer: 70,
       splitProvider: 30,
-      customerUsd: 105,
-      providerUsd: 45,
-      rationale: "L2 Vision analysis confirms 2 out of 4 contracted hours delivered. Proposed 70/30 partial split based on anchored photo timestamps."
+      customerUsd: Math.round((intent?.maxUsd || 150) * 0.7),
+      providerUsd: Math.round((intent?.maxUsd || 150) * 0.3),
+      rationale: `L2 Vision analysis of complaint "${complaint}" confirms partial delivery. Proposed 70/30 split based on anchored evidence.`
     });
     toast.warning("Dispute opened! AI L2 Arbitrator generated 70/30 resolution.");
   };
 
   const handleExecuteResolution = () => {
     setStep('resolved');
-    toast.success("Both parties signed resolution! Arc Smart Contract executed $105 / $45 refund split.");
+    toast.success("Both parties signed resolution! Arc Smart Contract executed split refund.");
   };
 
-  if (!ready || !authenticated) {
+  if (!ready || !authenticated || !intent) {
     return (
       <div className="min-h-screen flex items-center justify-center text-text-muted font-mono text-xs bg-background">
         <div className="flex items-center gap-3 glass-panel px-5 py-3.5 rounded-md">
           <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-          <span>Securing Hub...</span>
+          <span>Loading Intent Hub...</span>
         </div>
       </div>
     );
   }
+
+  const primaryProvider = intent.providers[0];
 
   return (
     <main className="max-w-4xl mx-auto p-6 md:p-12 min-h-screen">
@@ -125,7 +133,7 @@ export default function IntentTransactionPage() {
           <span>Back to Intent Studio</span>
         </Link>
 
-        {/* Precision Role Switcher */}
+        {/* Role Switcher */}
         <div className="glass-panel p-1 rounded-md flex gap-1 text-xs font-mono">
           <button
             type="button"
@@ -148,12 +156,12 @@ export default function IntentTransactionPage() {
       <header className="mb-8 flex items-start justify-between flex-wrap gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="font-display text-2xl md:text-3xl font-bold tracking-tight">Intent: Verified Photographer</h1>
+            <h1 className="font-display text-2xl md:text-3xl font-bold tracking-tight">Intent: {intent.service}</h1>
             <span className="text-xs font-mono bg-white/10 text-foreground px-2 py-0.5 rounded-md border border-white/10">
-              Max $150 Budget
+              Max ${intent.maxUsd} Budget
             </span>
           </div>
-          <p className="text-text-muted font-mono text-xs mt-1">Job ID: 0x9b4f...a1c2 • Arc Testnet USDC Escrow</p>
+          <p className="text-text-muted font-mono text-xs mt-1">Intent ID: {intent.id} • Arc Testnet USDC Escrow</p>
         </div>
 
         <StatusBadge 
@@ -162,27 +170,9 @@ export default function IntentTransactionPage() {
         />
       </header>
 
-      {/* Event Timeline Bar */}
+      {/* Reusable Transaction Timeline */}
       <section className="mb-8">
-        <SolidCard variant="glass" className="p-3.5 rounded-md">
-          <div className="flex justify-between items-center text-xs font-mono text-text-muted overflow-x-auto gap-4 py-0.5">
-            <span className={step !== 'pending' ? 'text-success font-semibold' : 'text-foreground'}>
-              1. REQUESTED
-            </span>
-            <span>→</span>
-            <span className={step === 'paid' || step === 'evidence_submitted' || step === 'disputed' || step === 'resolved' ? 'text-success font-semibold' : ''}>
-              2. AUTHORIZED & PAID
-            </span>
-            <span>→</span>
-            <span className={step === 'evidence_submitted' || step === 'disputed' || step === 'resolved' ? 'text-success font-semibold' : ''}>
-              3. EVIDENCE ANCHORED
-            </span>
-            <span>→</span>
-            <span className={step === 'disputed' || step === 'resolved' ? 'text-warning font-semibold' : ''}>
-              {step === 'resolved' ? '4. RESOLVED (70/30)' : step === 'disputed' ? '4. DISPUTED' : '4. FULFILLMENT'}
-            </span>
-          </div>
-        </SolidCard>
+        <TransactionTimeline step={step} />
       </section>
 
       {/* Details Grid */}
@@ -192,17 +182,14 @@ export default function IntentTransactionPage() {
           <span className="text-[10px] font-mono uppercase tracking-widest text-text-muted block mb-1 font-semibold">
             Verified Provider
           </span>
-          <p className="font-display font-bold text-lg mb-1">Apex Photography Studio</p>
-          <p className="text-xs text-text-muted mb-4 font-mono">San Francisco, CA</p>
+          <p className="font-display font-bold text-lg mb-1">{primaryProvider.name}</p>
+          <p className="text-xs text-text-muted mb-4 font-mono">{intent.city}</p>
           
           <div className="pt-4 border-t border-white/10">
             <span className="text-[10px] font-mono text-text-muted mb-1 uppercase tracking-wider block font-semibold">
-              The Graph Indexer Trust Score
+              The Graph Indexer Reputation
             </span>
-            <div className="flex items-end gap-2">
-              <span className="text-3xl font-display font-bold text-success">{trustScore}%</span>
-              <span className="text-xs text-text-muted mb-1 font-mono">from 142 on-chain jobs</span>
-            </div>
+            <TrustScoreBadge score={primaryProvider.trustScore} jobsCount={primaryProvider.jobsCount} />
           </div>
         </SolidCard>
 
@@ -214,7 +201,7 @@ export default function IntentTransactionPage() {
           <div className="space-y-2.5 font-mono text-xs mt-3">
             <div className="flex justify-between items-center py-1.5 border-b border-white/10">
               <span className="text-text-muted">Max Budget Cap</span>
-              <span className="font-bold text-foreground">$150.00 USDC</span>
+              <span className="font-bold text-foreground">${intent.maxUsd}.00 USDC</span>
             </div>
             <div className="flex justify-between items-center py-1.5 border-b border-white/10">
               <span className="text-text-muted">Settlement Rail</span>
@@ -237,14 +224,13 @@ export default function IntentTransactionPage() {
               <SolidCard variant="glass" className="p-6 text-center border-dashed border-white/20 rounded-lg">
                 <h3 className="font-display font-bold text-lg mb-1">Authorize EIP-712 Mandate & Lock Escrow</h3>
                 <p className="text-text-muted mb-5 max-w-md mx-auto text-xs leading-relaxed font-mono">
-                  World Selfie Check confirms humanity before signing spending policy parameters ($150 max cap).
+                  World Selfie Check confirms humanity before signing spending policy parameters (${intent.maxUsd} max cap).
                 </p>
                 
                 <div className="max-w-md mx-auto">
                   <VerifyHumanityWidget 
-                    action="lock-escrow-123" 
+                    action={`lock-escrow-${intent.id}`} 
                     buttonText="Complete World Selfie Check"
-                    onVerified={() => {}}
                   />
                 </div>
 
@@ -252,7 +238,7 @@ export default function IntentTransactionPage() {
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-5 pt-5 border-t border-white/10">
                     <p className="text-xs text-success mb-3 font-mono">Humanity Verified. Sign EIP-712 Mandate with Privy wallet.</p>
                     <PrimaryButton onClick={handleSignMandateAndLock} className="w-full sm:w-auto px-6 py-2.5 text-xs">
-                      Sign EIP-712 Mandate & Deposit $150 USDC
+                      Sign EIP-712 Mandate & Deposit ${intent.maxUsd} USDC
                     </PrimaryButton>
                   </motion.div>
                 )}
@@ -262,9 +248,9 @@ export default function IntentTransactionPage() {
             {/* Step 2: Escrow Locked Waiting for Evidence */}
             {step === 'paid' && (
               <SolidCard variant="glass" className="p-6 text-center border-l-2 border-l-success rounded-lg">
-                <h3 className="font-display font-bold text-lg mb-1">$150 USDC Secured in Arc Escrow</h3>
+                <h3 className="font-display font-bold text-lg mb-1">${intent.maxUsd} USDC Secured in Arc Escrow</h3>
                 <p className="text-text-muted text-xs font-mono max-w-md mx-auto mb-4">
-                  Provider "Apex Photography Studio" is now executing the service. Waiting for photo evidence upload.
+                  Provider "{primaryProvider.name}" is now executing the service. Waiting for photo evidence upload.
                 </p>
                 <div className="inline-flex items-center gap-2 text-xs font-mono text-text-muted bg-white/5 px-3.5 py-1.5 rounded-md border border-white/10">
                   <span>Switch to "Provider View" in top toggle to simulate evidence submission.</span>
@@ -272,40 +258,13 @@ export default function IntentTransactionPage() {
               </SolidCard>
             )}
 
-            {/* Step 3: Evidence Submitted — Customer can confirm or dispute */}
+            {/* Step 3: Reusable DisputeResolver */}
             {step === 'evidence_submitted' && (
-              <SolidCard variant="glass" className="p-6 rounded-lg">
-                <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
-                  <div>
-                    <h3 className="font-display font-bold text-base">Work Evidence Submitted</h3>
-                    <p className="text-xs text-text-muted font-mono mt-0.5">SHA-256 Hash: {evidenceHash}</p>
-                  </div>
-                  <span className="text-xs font-mono bg-success/20 text-success border border-success/30 px-2.5 py-0.5 rounded-sm">
-                    Anchored on Arc
-                  </span>
-                </div>
-
-                <div className="mb-5 p-3.5 rounded-md bg-white/5 border border-white/10">
-                  <span className="text-xs text-text-muted block mb-1.5 font-mono">Customer Complaint / Dispute Input:</span>
-                  <input 
-                    type="text" 
-                    value={disputeReason}
-                    onChange={(e) => setDisputeReason(e.target.value)}
-                    placeholder="e.g. Photographer left 2 hours early; only 50 event photos delivered..."
-                    className="w-full bg-black/40 border border-white/10 rounded-md p-2.5 text-xs text-foreground focus:outline-none font-sans"
-                  />
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3 justify-end">
-                  <PrimaryButton variant="danger" onClick={handleFileDispute} className="px-5 py-2 text-xs">
-                    File Complaint & Dispute
-                  </PrimaryButton>
-
-                  <PrimaryButton variant="primary" onClick={() => setStep('resolved')} className="px-5 py-2 text-xs">
-                    Confirm Work & Release $150
-                  </PrimaryButton>
-                </div>
-              </SolidCard>
+              <DisputeResolver
+                evidenceHash={evidenceHash}
+                onDisputeSubmitted={handleDisputeSubmitted}
+                onConfirmWork={() => setStep('resolved')}
+              />
             )}
 
             {/* Step 4: Dispute Open & AI L2 Arbitration */}
@@ -348,23 +307,9 @@ export default function IntentTransactionPage() {
             )}
           </motion.div>
         ) : (
-          /* Provider View */
+          /* Provider View with Reusable EvidenceUploader */
           <motion.div key="provider-flow" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-            <SolidCard variant="glass" className="p-6 rounded-lg">
-              <h3 className="font-display font-bold text-lg mb-1">Provider Evidence Dropzone</h3>
-              <p className="text-xs text-text-muted font-mono mb-5">
-                Upload completion photos. Intentra will generate a SHA-256 evidence hash to anchor on Arc.
-              </p>
-
-              <div className="p-8 border border-dashed border-white/20 rounded-md text-center bg-white/5 mb-5">
-                <span className="text-xs font-mono text-text-muted block">Drag event photos here or click to select</span>
-              </div>
-
-              <PrimaryButton onClick={handleUploadEvidence} className="w-full py-2.5 text-xs flex items-center justify-center gap-2">
-                <Upload className="w-3.5 h-3.5" />
-                <span>Hash Photo & Anchor Evidence on Arc</span>
-              </PrimaryButton>
-            </SolidCard>
+            <EvidenceUploader onEvidenceSubmitted={handleEvidenceSubmitted} />
           </motion.div>
         )}
       </AnimatePresence>
