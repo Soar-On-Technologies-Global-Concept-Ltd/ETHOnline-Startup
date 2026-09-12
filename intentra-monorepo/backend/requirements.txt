@@ -31,3 +31,4 @@ pyjwt[crypto]>=2.9              # 2.14.0   ES256 verification of Privy access to
 anthropic>=1.0,<2               # 1.5.0    messages.parse with structured output and server-side fallbacks
 pillow>=11.0                    # 12.3.0   EXIF stripping and format sniffing
 boto3>=1.35                     # 1.43.93  S3-compatible evidence storage (STORAGE_BACKEND=s3)
+openai==3.13.0

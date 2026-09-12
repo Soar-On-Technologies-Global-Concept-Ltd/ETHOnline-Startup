@@ -48,7 +48,8 @@ class Settings(BaseSettings):
     world_mode: Literal["live", "fake"] = "live"
 
     # AgentService
-    llm_provider: Literal["anthropic", "fake"] = "anthropic"
+    llm_provider: Literal["anthropic", "fake", "openai"] = "anthropic"
+    llm_base_url: str | None = None
     llm_api_key: SecretStr | None = None
     llm_model: str = "claude-opus-5"
     ai_timeout_seconds: float = 20.0
