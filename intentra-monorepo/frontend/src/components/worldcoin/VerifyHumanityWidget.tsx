@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { IDKitRequestWidget, orbLegacy, type RpContext } from "@worldcoin/idkit";
+import { IDKitRequestWidget, deviceLegacy, type RpContext } from "@worldcoin/idkit";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { toast } from "sonner";
 import { useIntentStore } from "@/store/intentStore";
@@ -108,7 +108,7 @@ export function VerifyHumanityWidget({
           action={action}
           rp_context={rpContext}
           allow_legacy_proofs={true}
-          preset={orbLegacy()}
+          preset={deviceLegacy()}
           handleVerify={handleVerify}
           onSuccess={onSuccess}
         />
