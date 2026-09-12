@@ -97,7 +97,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
         };
       } else {
         // 1. Get createIntent calls from backend
-        let response = await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
+        const response = await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
           method: "POST",
           headers,
           body: JSON.stringify({}),
@@ -140,7 +140,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
           if (!intentBound) throw new Error("Timed out waiting for Arc intent to initialize");
 
           // Fetch fund calls now that intent is bound
-          let response = await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
+          const response = await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
             method: "POST",
             headers,
             body: JSON.stringify({}),
