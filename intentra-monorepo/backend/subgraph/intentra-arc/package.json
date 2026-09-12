@@ -1,0 +1,17 @@
+{
+  "name": "intentra-arc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Intentra escrow subgraph on Arc: provider trust from on-chain history",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy": "graph deploy intentra-arc --node https://api.studio.thegraph.com/deploy/ --ipfs https://ipfs.network.thegraph.com",
+    "create-local": "graph create --node http://localhost:8020/ intentra-arc",
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 intentra-arc"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli": "0.97.1",
+    "@graphprotocol/graph-ts": "0.38.1"
+  }
+}

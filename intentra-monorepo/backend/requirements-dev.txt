@@ -1,0 +1,10 @@
+# Everything needed to run the backend, plus the test and lint tooling.
+#
+#   pip install -r requirements-dev.txt
+
+-r requirements.txt
+
+pytest>=8.3                     # 9.1.1
+pytest-asyncio>=0.24            # 1.4.0
+import-linter>=2.1              # 2.15     the three layering contracts in pyproject.toml
+setuptools>=68                  # 84.0.0   build backend for `pip install .`
