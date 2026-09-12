@@ -18,36 +18,36 @@
   --font-display: var(--font-display);
 }
 
-:root { /* Light Mode (Studio White Base) */
-  --background: #FFFFFF; 
-  --surface: #F4F4F5; 
-  --surface-hover: #E4E4E7;
-  --border: #E5E7EB;
+:root { /* Light Mode (Apple Studio White) */
+  --background: #FAFAFA; 
+  --surface: rgba(255, 255, 255, 0.75); 
+  --surface-hover: rgba(244, 244, 245, 0.85);
+  --border: rgba(0, 0, 0, 0.08);
   
-  --foreground: #000000; 
-  --text-muted: #52525B; 
+  --foreground: #09090B; 
+  --text-muted: #71717A; 
   
-  --primary: #000000; 
+  --primary: #09090B; 
   --primary-foreground: #FFFFFF;
-  --secondary: #18181B; 
+  --secondary: #F4F4F5; 
   
-  --success: #059669;
-  --warning: #D97706; 
-  --danger: #DC2626;
+  --success: #10B981;
+  --warning: #F59E0B; 
+  --danger: #EF4444; 
 }
 
-.dark { /* Dark Mode (Pitch Black Base) */
+.dark { /* Dark Mode (Apple Dark Material / Pitch Black) */
   --background: #000000; 
-  --surface: #111111; 
-  --surface-hover: #222222;
-  --border: #27272A; /* Crisp razor thin border */
+  --surface: rgba(18, 18, 20, 0.7); 
+  --surface-hover: rgba(30, 30, 35, 0.8);
+  --border: rgba(255, 255, 255, 0.12); /* Subtle light-catching rim */
   
-  --foreground: #FFFFFF; 
+  --foreground: #F4F4F5; 
   --text-muted: #A1A1AA; 
   
   --primary: #FFFFFF; 
   --primary-foreground: #000000;
-  --secondary: #27272A; 
+  --secondary: #1C1C1E; 
   
   --success: #10B981;
   --warning: #F59E0B; 
@@ -58,5 +58,39 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+}
+
+/* Apple Materials & Translucency Utility Classes */
+.glass-panel {
+  background: rgba(18, 18, 20, 0.65);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.glass-nav {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-card {
+  background: rgba(24, 24, 27, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+}
+
+/* Apple Press Response */
+.apple-button {
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease, opacity 150ms ease;
+}
+.apple-button:active {
+  transform: scale(0.97);
 }
