@@ -5,18 +5,13 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SolidCard } from '@/components/ui/SolidCard';
-import { ArrowRight } from "lucide-react";
+import { FiArrowRight as ArrowRight } from "react-icons/fi";
 import { motion } from "framer-motion";
 
 export default function LandingPage() {
   const { login, ready, authenticated } = usePrivy();
   const router = useRouter();
 
-  useEffect(() => {
-    if (ready && authenticated) {
-      router.push("/dashboard/consumer");
-    }
-  }, [ready, authenticated, router]);
 
   return (
     <div className="min-h-[calc(100vh-4rem)] md:h-[calc(100vh-4rem)] md:max-h-[calc(100vh-4rem)] md:overflow-hidden bg-background flex flex-col justify-center items-center px-4 sm:px-6 py-6 sm:py-0 selection:bg-white/20 selection:text-white">
@@ -61,8 +56,8 @@ export default function LandingPage() {
           transition={{ type: "spring", bounce: 0, duration: 0.35, delay: 0.2 }}
           className="flex flex-col sm:flex-row gap-3 mb-8 sm:mb-10 w-full sm:w-auto"
         >
-          <PrimaryButton variant="primary" className="text-xs px-6 py-3 sm:py-2.5 flex items-center justify-center gap-2 w-full sm:w-auto" onClick={login} disabled={!ready}>
-            <span>Start Accountable Transaction</span>
+          <PrimaryButton variant="primary" className="text-xs px-6 py-3 sm:py-2.5 flex items-center justify-center gap-2 w-full sm:w-auto" onClick={() => authenticated ? router.push("/dashboard/consumer") : login()} disabled={!ready}>
+            <span>{authenticated ? "Go to Dashboard" : "Start Accountable Transaction"}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </PrimaryButton>
         </motion.div>

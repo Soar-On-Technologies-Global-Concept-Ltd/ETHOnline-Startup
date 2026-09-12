@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
-import { AlertTriangle } from "lucide-react";
+import { FiAlertTriangle as AlertTriangle } from "react-icons/fi";
 
 export default function Error({
   error,

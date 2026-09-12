@@ -3,7 +3,7 @@
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { SolidCard } from "@/components/ui/SolidCard";
 import { QuoteCard } from "@/components/ui/QuoteCard";
-import { ArrowRight, Search } from "lucide-react";
+import { FiArrowRight as ArrowRight, FiSearch as Search } from "react-icons/fi";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePrivy } from "@privy-io/react-auth";
@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { parseAndCreateIntent, Intent } from "@/lib/api";
 
 export default function ConsumerDashboard() {
-  const { ready, authenticated, user } = usePrivy();
+  const { ready, authenticated, user, getAccessToken } = usePrivy();
   const router = useRouter();
 
   const [prompt, setPrompt] = useState("Find a verified photographer for my event, max $150.");
@@ -29,9 +29,15 @@ export default function ConsumerDashboard() {
     setIsAnalyzing(true);
     setIntent(null);
 
-    const result = await parseAndCreateIntent(inputPrompt);
-    setIsAnalyzing(false);
-    setIntent(result);
+    try {
+      const token = await getAccessToken();
+      const result = await parseAndCreateIntent(inputPrompt, token || "");
+      setIntent(result);
+    } catch(err) {
+      console.error(err);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   useEffect(() => {

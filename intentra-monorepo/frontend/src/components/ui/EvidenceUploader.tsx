@@ -3,7 +3,7 @@
 import * as React from "react";
 import { SolidCard } from "@/components/ui/SolidCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
-import { Upload } from "lucide-react";
+import { FiUpload as Upload } from "react-icons/fi";
 import { toast } from "sonner";
 
 interface EvidenceUploaderProps {

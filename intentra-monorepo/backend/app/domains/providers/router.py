@@ -16,6 +16,7 @@ from app.domains.providers import ai as recommender
 from app.domains.providers import ranking
 from app.domains.providers import service as providers
 from app.domains.providers import trust as trust_service
+from app.domains.providers.schemas import ProviderOnboardRequest
 
 router = APIRouter(tags=["providers"])
 
@@ -78,3 +79,31 @@ async def trust(provider_id: uuid.UUID, user: CurrentUser = Depends(current_user
             raise NotFound("provider not found")
         card = await trust_service.card_for(s, await providers.get(s, provider_id))
     return {"provider": summary, "trust": card.as_json()}
+
+
+@router.post("/providers/onboard", summary="Onboard as a new provider")
+async def onboard(req: ProviderOnboardRequest, user: CurrentUser = Depends(current_user)) -> dict:
+    async with session_scope() as s:
+        provider = await providers.onboard_user(s, user.id, req.trade, req.areas, req.base_rate_minor)
+        return {
+            "id": str(provider.id),
+            "trade": provider.trade,
+            "areas": provider.areas,
+            "base_rate_minor": provider.base_rate_minor
+        }
+
+
+@router.get("/providers/me", summary="Get the current user's provider profile")
+async def get_my_profile(user: CurrentUser = Depends(current_user)) -> dict:
+    async with sessionmaker()() as s:
+        provider = await providers.for_user(s, user.id)
+        if not provider:
+            raise NotFound("not a provider", code="not_provider")
+        return {
+            "id": str(provider.id),
+            "display_name": provider.display_name,
+            "trade": provider.trade,
+            "areas": provider.areas,
+            "base_rate_minor": provider.base_rate_minor,
+            "verified": provider.verified
+        }

@@ -8,7 +8,7 @@ import { TransactionTimeline, TimelineStep } from "@/components/ui/TransactionTi
 import { EvidenceUploader } from "@/components/ui/EvidenceUploader";
 import { DisputeResolver } from "@/components/ui/DisputeResolver";
 import { VerifyHumanityWidget } from "@/components/worldcoin/VerifyHumanityWidget";
-import { ArrowLeft, Lock } from "lucide-react";
+import { FiArrowLeft as ArrowLeft, FiLock as Lock } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
-import { ShieldAlert } from 'lucide-react';
+import { FiAlertTriangle as ShieldAlert } from 'react-icons/fi';
 
 export default function NotFound() {
   return (

@@ -18,24 +18,36 @@ export interface ProviderQuote {
   isRecommended: boolean;
 }
 
+export interface ProviderProfile {
+  id: string;
+  display_name?: string;
+  trade: string;
+  areas: string[];
+  base_rate_minor: number;
+  verified?: boolean;
+}
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
 
-export async function parseAndCreateIntent(rawPrompt: string): Promise<Intent> {
+export async function parseAndCreateIntent(rawPrompt: string, token: string): Promise<Intent> {
   try {
     const res = await fetch(`${API_BASE_URL}/intents`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ raw_prompt: rawPrompt }),
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}` 
+      },
+      body: JSON.stringify({ text: rawPrompt }),
     });
 
     if (res.ok) {
       const data = await res.json();
       return {
-        id: data.id || `intent_${Date.now().toString(36)}`,
-        service: data.service || "Event Photography",
-        city: data.city || "San Francisco, CA",
-        maxUsd: data.max_usd || 150,
-        window: data.window || "This Saturday",
+        id: data.intent_id || `intent_${Date.now().toString(36)}`,
+        service: data.spec?.service || "Event Photography",
+        city: data.spec?.area || "San Francisco, CA",
+        maxUsd: data.spec?.budget_max_minor ? Math.round(data.spec.budget_max_minor / 160000) : 150,
+        window: data.spec?.date || "This Saturday",
         status: "MATCHED",
         providers: data.providers || getMockProviders(),
       };
@@ -93,4 +105,37 @@ export async function fetchIntentById(id: string): Promise<Intent> {
     status: "MATCHED",
     providers: getMockProviders(),
   };
+}
+
+export async function fetchMyProviderProfile(token: string): Promise<ProviderProfile | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/providers/me`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.error("Failed to fetch provider profile", err);
+  }
+  return null;
+}
+
+export async function onboardProvider(token: string, data: { trade: string, areas: string[], base_rate_minor: number }): Promise<ProviderProfile | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/providers/onboard`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}` 
+      },
+      body: JSON.stringify(data),
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.error("Failed to onboard provider", err);
+  }
+  return null;
 }

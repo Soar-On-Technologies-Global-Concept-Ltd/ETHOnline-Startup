@@ -4,7 +4,7 @@ import uuid
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.errors import NotFound
+from app.core.errors import NotFound, Conflict
 from app.domains.identity import service as identity
 from app.domains.providers.models import Provider
 
@@ -64,3 +64,26 @@ async def wallets_for(s: AsyncSession, providers: list[Provider]) -> dict[uuid.U
 async def is_verified(s: AsyncSession, provider_id: uuid.UUID | None) -> bool:
     provider = await get_optional(s, provider_id)
     return bool(provider and provider.verified)
+
+
+async def onboard_user(s: AsyncSession, user_id: uuid.UUID, trade: str, areas: list[str], base_rate_minor: int) -> Provider:
+    """Creates a new provider profile for a user and updates their role."""
+    existing = await for_user(s, user_id)
+    if existing:
+        raise Conflict("user is already a provider", code="already_provider")
+    
+    user = await identity.get(s, user_id)
+    provider = Provider(
+        user_id=user.id,
+        email=user.email,
+        display_name=user.display_name or "New Provider",
+        trade=trade,
+        areas=areas,
+        base_rate_minor=base_rate_minor,
+        verified=False,
+        seeded=False
+    )
+    s.add(provider)
+    await identity.set_role(s, user.id, "provider")
+    await s.flush()
+    return provider

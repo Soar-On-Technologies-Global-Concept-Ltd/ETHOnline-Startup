@@ -19,40 +19,43 @@
   --font-display: 'Exo 2', var(--font-exo2), system-ui, sans-serif;
 }
 
-:root { /* Light Mode (Apple Studio White) */
-  --background: #FAFAFA; 
-  --surface: rgba(255, 255, 255, 0.75); 
+:root {
+  /* Light Mode (Apple Studio White) */
+  --background: #FAFAFA;
+  --surface: rgba(255, 255, 255, 0.75);
   --surface-hover: rgba(244, 244, 245, 0.85);
   --border: rgba(0, 0, 0, 0.08);
-  
-  --foreground: #09090B; 
-  --text-muted: #71717A; 
-  
-  --primary: #09090B; 
+
+  --foreground: #09090B;
+  --text-muted: #71717A;
+
+  --primary: #09090B;
   --primary-foreground: #FFFFFF;
-  --secondary: #F4F4F5; 
-  
+  --secondary: #F4F4F5;
+
   --success: #10B981;
-  --warning: #F59E0B; 
-  --danger: #EF4444; 
+  --warning: #F59E0B;
+  --danger: #EF4444;
 }
 
-.dark { /* Dark Mode (Apple Dark Precision Material) */
-  --background: #000000; 
-  --surface: rgba(18, 18, 20, 0.7); 
+.dark {
+  /* Dark Mode (Apple Dark Precision Material) */
+  --background: #000000;
+  --surface: rgba(18, 18, 20, 0.7);
   --surface-hover: rgba(30, 30, 35, 0.8);
-  --border: rgba(255, 255, 255, 0.12); /* Subtle light-catching rim */
-  
-  --foreground: #F4F4F5; 
-  --text-muted: #A1A1AA; 
-  
-  --primary: #FFFFFF; 
+  --border: rgba(255, 255, 255, 0.12);
+  /* Subtle light-catching rim */
+
+  --foreground: #F4F4F5;
+  --text-muted: #A1A1AA;
+
+  --primary: #FFFFFF;
   --primary-foreground: #000000;
-  --secondary: #1C1C1E; 
-  
+  --secondary: #1C1C1E;
+
   --success: #10B981;
-  --warning: #F59E0B; 
-  --danger: #EF4444; 
+  --warning: #F59E0B;
+  --danger: #EF4444;
 }
 
 @layer base {
@@ -72,7 +75,8 @@
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 0.75rem; /* 12px precision radius */
+  border-radius: 0.75rem;
+  /* 12px precision radius */
 }
 
 .glass-nav {
@@ -87,7 +91,8 @@
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0.75rem; /* 12px precision radius */
+  border-radius: 0.75rem;
+  /* 12px precision radius */
   box-shadow: 0 16px 32px -12px rgba(0, 0, 0, 0.4);
 }
 
@@ -95,6 +100,7 @@
 .apple-button {
   transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease, opacity 150ms ease;
 }
+
 .apple-button:active {
   transform: scale(0.97);
 }
