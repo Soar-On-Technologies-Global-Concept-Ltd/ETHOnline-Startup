@@ -1,0 +1,34 @@
+"A provider's on-chain history. Every number here comes from escrow events, not from Intentra's database."
+type Provider @entity(immutable: false) {
+  id: Bytes!                      # provider wallet address
+  jobsFunded: Int!
+  jobsDelivered: Int!
+  jobsReleased: Int!
+  jobsSettled: Int!
+  jobsRefunded: Int!
+  disputes: Int!
+  evidenceAnchored: Int!
+  paidOutMicroUsdc: BigInt!
+  refundedMicroUsdc: BigInt!
+  secondsToEvidenceTotal: BigInt!
+  jobs: [Job!]! @derivedFrom(field: "provider")
+}
+
+"One escrowed job, keyed by the transaction key the backend generated."
+type Job @entity(immutable: false) {
+  id: Bytes!                      # txKey
+  provider: Provider!
+  customer: Bytes!
+  amount: BigInt!
+  authorizationHash: Bytes!
+  status: String!                 # Funded | Submitted | Disputed | Released | Resolved | Refunded
+  fundedAt: BigInt!
+  firstEvidenceAt: BigInt
+  submittedAt: BigInt
+  releaseAfter: BigInt
+  closedAt: BigInt
+  toProvider: BigInt
+  toCustomer: BigInt
+  outcomeHash: Bytes
+  evidenceCount: Int!
+}

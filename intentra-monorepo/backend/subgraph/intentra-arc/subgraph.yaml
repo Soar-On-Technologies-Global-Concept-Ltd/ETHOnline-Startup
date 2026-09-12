@@ -1,0 +1,39 @@
+specVersion: 1.0.0
+description: Intentra escrow on Arc — trust scores built from what actually happened on-chain.
+repository: https://github.com/Soar-On-Technologies-Global-Concept-Ltd/ETHOnline-Startup
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: IntentraEscrow
+    network: arc
+    source:
+      address: "0x0000000000000000000000000000000000000000"   # set to ESCROW_ADDRESS before deploying
+      abi: IntentraEscrow
+      startBlock: 0                                            # set to ESCROW_DEPLOY_BLOCK
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Provider
+        - Job
+      abis:
+        - name: IntentraEscrow
+          file: ./abis/IntentraEscrow.json
+      eventHandlers:
+        - event: JobFunded(indexed bytes32,indexed address,indexed address,uint256,bytes32,uint64,uint64)
+          handler: handleJobFunded
+        - event: EvidenceAnchored(indexed bytes32,bytes32)
+          handler: handleEvidenceAnchored
+        - event: Submitted(indexed bytes32,bytes32,uint64)
+          handler: handleSubmitted
+        - event: DisputeOpened(indexed bytes32,bytes32)
+          handler: handleDisputeOpened
+        - event: Released(indexed bytes32,uint256)
+          handler: handleReleased
+        - event: Resolved(indexed bytes32,uint256,uint256,bytes32)
+          handler: handleResolved
+        - event: Refunded(indexed bytes32,uint256)
+          handler: handleRefunded
+      file: ./src/mapping.ts

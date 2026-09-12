@@ -1,0 +1,293 @@
+[
+  {
+    "type": "function",
+    "name": "fund",
+    "stateMutability": "nonpayable",
+    "inputs": [
+      {
+        "name": "txKey",
+        "type": "bytes32"
+      },
+      {
+        "name": "provider",
+        "type": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "name": "authorizationHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "disputeWindow",
+        "type": "uint64"
+      },
+      {
+        "name": "expiresAt",
+        "type": "uint64"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "anchorEvidence",
+    "stateMutability": "nonpayable",
+    "inputs": [
+      {
+        "name": "txKey",
+        "type": "bytes32"
+      },
+      {
+        "name": "evidenceHash",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "submit",
+    "stateMutability": "nonpayable",
+    "inputs": [
+      {
+        "name": "txKey",
+        "type": "bytes32"
+      },
+      {
+        "name": "deliverableHash",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "release",
+    "stateMutability": "nonpayable",
+    "inputs": [
+      {
+        "name": "txKey",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "openDispute",
+    "stateMutability": "nonpayable",
+    "inputs": [
+      {
+        "name": "txKey",
+        "type": "bytes32"
+      },
+      {
+        "name": "complaintHash",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "resolve",
+    "stateMutability": "nonpayable",
+    "inputs": [
+      {
+        "name": "txKey",
+        "type": "bytes32"
+      },
+      {
+        "name": "providerBps",
+        "type": "uint16"
+      },
+      {
+        "name": "outcomeHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "sigCustomer",
+        "type": "bytes"
+      },
+      {
+        "name": "sigProvider",
+        "type": "bytes"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "claimRefund",
+    "stateMutability": "nonpayable",
+    "inputs": [
+      {
+        "name": "txKey",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "event",
+    "name": "JobFunded",
+    "anonymous": false,
+    "inputs": [
+      {
+        "name": "txKey",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "customer",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "provider",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "authorizationHash",
+        "type": "bytes32",
+        "indexed": false
+      },
+      {
+        "name": "disputeWindow",
+        "type": "uint64",
+        "indexed": false
+      },
+      {
+        "name": "expiresAt",
+        "type": "uint64",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "EvidenceAnchored",
+    "anonymous": false,
+    "inputs": [
+      {
+        "name": "txKey",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "evidenceHash",
+        "type": "bytes32",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "Submitted",
+    "anonymous": false,
+    "inputs": [
+      {
+        "name": "txKey",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "deliverableHash",
+        "type": "bytes32",
+        "indexed": false
+      },
+      {
+        "name": "releaseAfter",
+        "type": "uint64",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "DisputeOpened",
+    "anonymous": false,
+    "inputs": [
+      {
+        "name": "txKey",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "complaintHash",
+        "type": "bytes32",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "Released",
+    "anonymous": false,
+    "inputs": [
+      {
+        "name": "txKey",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "Resolved",
+    "anonymous": false,
+    "inputs": [
+      {
+        "name": "txKey",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "toProvider",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "toCustomer",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "outcomeHash",
+        "type": "bytes32",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "Refunded",
+    "anonymous": false,
+    "inputs": [
+      {
+        "name": "txKey",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ]
+  }
+]
