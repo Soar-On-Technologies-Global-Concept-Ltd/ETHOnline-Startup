@@ -1,0 +1,86 @@
+# Render blueprint for the Intentra backend.
+#
+# Render reads a blueprint from the REPOSITORY ROOT, so copy this file there before creating the Blueprint:
+#     cp intentra-monorepo/backend/render.yaml render.yaml
+# The paths below are already written relative to the repository root.
+#
+# Prefer the dashboard? Create a Web Service by hand with:
+#     Root Directory  intentra-monorepo/backend
+#     Runtime         Docker
+#     Health Check    /healthz
+# and set the same environment variables listed under envVars.
+
+databases:
+  - name: intentra-db
+    databaseName: intentra
+    user: intentra
+    plan: free            # free Postgres expires after 30 days — fine for the hackathon, not beyond it
+
+services:
+  - type: web
+    name: intentra-api
+    runtime: docker
+    plan: free            # free web services sleep after 15 idle minutes, which stops the chain watcher.
+                          # Use `starter` if the watcher must keep following Arc between demos.
+    region: oregon
+    rootDir: intentra-monorepo/backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    autoDeploy: false     # a hackathon deadline is the wrong time for a push to redeploy the demo
+    envVars:
+      # --- database: Render substitutes its own internal URL, which the app rewrites for asyncpg -------------
+      - key: DATABASE_URL
+        fromDatabase:
+          name: intentra-db
+          property: connectionString
+
+      # --- secrets: generated once by Render, never committed ------------------------------------------------
+      - key: SIGNING_SECRET
+        generateValue: true
+      - key: INTERNAL_WEBHOOK_SECRET
+        generateValue: true
+
+      # --- mode ----------------------------------------------------------------------------------------------
+      # ENV=dev keeps POST /v1/webhooks/simulate reachable (still HMAC-signed with INTERNAL_WEBHOOK_SECRET),
+      # which is what lets the demo walk a funding and a dispute without a customer wallet broadcasting.
+      # ENV=staging turns that route off and refuses every `fake` below, so it needs real Privy/World/LLM keys.
+      - key: ENV
+        value: dev
+      - key: PRIVY_MODE
+        value: fake
+      - key: WORLD_MODE
+        value: fake
+      - key: LLM_PROVIDER
+        value: fake       # set to `anthropic` and add LLM_API_KEY for the real model
+
+      # --- Arc: the live IntentraEscrow on Arc testnet ---------------------------------------------------------
+      - key: ARC_RPC_URL
+        value: https://rpc.testnet.arc.io
+      - key: ARC_CHAIN_ID
+        value: "5042002"
+      - key: ESCROW_ADDRESS
+        value: "0xeF3a099CC877F6e274b037847A6ee44C4d62648D"
+      - key: ESCROW_DEPLOY_BLOCK
+        value: "61719028"
+      - key: USDC_ADDRESS
+        value: "0xFa5a5744898B71c93fF80F179d95184864143190"
+
+      # --- set these in the dashboard; they never belong in the repository -------------------------------------
+      - key: RESOLVER_PRIVATE_KEY
+        sync: false       # the aiArbitrator key. Leave unset and the backend simply queues nothing to send.
+      - key: LLM_API_KEY
+        sync: false
+      - key: GRAPH_QUERY_URL
+        sync: false       # unset → trust cards read "trust data unavailable" and rank on a neutral 50
+      - key: PUBLIC_BASE_URL
+        sync: false       # https://<your-service>.onrender.com — set after the first deploy names the service
+      - key: CORS_ORIGINS
+        sync: false       # JSON array, e.g. ["https://intentra.vercel.app"]
+
+      # --- workers: one instance holds the Postgres advisory lock and runs the loops ----------------------------
+      - key: SEED_DEMO_DATA
+        value: "true"     # the three demo painters, on every boot; idempotent. Set to "false" for a real deployment.
+      - key: WORKERS_ENABLED
+        value: "true"
+      - key: LOG_LEVEL
+        value: INFO
