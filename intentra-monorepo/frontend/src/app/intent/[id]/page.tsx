@@ -50,16 +50,16 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
   useEffect(() => {
     async function loadIntent() {
       try {
-        const token = await getAccessToken();
-        const headers = token ? { "Authorization": `Bearer ${token}` } : {};
+        await getAccessToken();
         const data = await fetchIntentById(intentId); // We assume fetchIntentById handles this or doesn't need auth, but wait, the API lib might need auth. If the user gets 401s here, we need to update the lib. Let's just wrap the internal fetch calls for now.
         setIntent(data);
+        setStatus(data.status as "pending" | "funded" | "completed" | "disputed");
       } catch (e) {
         console.error(e);
       }
     }
     loadIntent();
-  }, [intentId]);
+  }, [intentId, getAccessToken]);
 
   // Save state to localStorage on change
   useEffect(() => {

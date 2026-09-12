@@ -1,7 +1,6 @@
 "use client";
 
 import React from 'react';
-import Link from 'next/link';
 import { useRouter } from "next/navigation";
 import { FiBookOpen as BookOpen, FiShield as ShieldCheck, FiZap as Zap, FiArrowRight as ArrowRight } from 'react-icons/fi';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
@@ -90,7 +89,7 @@ export default function DocsPage() {
               <span className="text-[10px] font-mono uppercase tracking-widest text-text-muted block mb-1.5 font-semibold">01 / Creation</span>
               <h3 className="font-display font-semibold text-sm mb-1.5">Intent Matching</h3>
               <p className="text-[11px] text-text-muted leading-relaxed font-sans">
-                Users submit natural language Intents (e.g. "I need a plumber tomorrow"). Our AI engines parse the requirements, budget, and location to find the perfect match.
+                Users submit natural language Intents (e.g. &quot;I need a plumber tomorrow&quot;). Our AI engines parse the requirements, budget, and location to find the perfect match.
               </p>
             </SolidCard>
             
