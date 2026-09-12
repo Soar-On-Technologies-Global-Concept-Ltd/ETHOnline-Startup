@@ -1,0 +1,70 @@
+# Repository-wide ignores.
+#
+# Each package (backend, frontend, contracts) keeps its own .gitignore for package-specific paths.
+# This one covers the repository root — where a developer's .env and stray build output land — and
+# acts as a backstop for anything the others miss.
+#
+# Note: git only treats "#" as a comment at the START of a line. A trailing comment becomes part of
+# the pattern and silently matches nothing, so every comment here is on its own line.
+
+# --- Secrets ------------------------------------------------------------------------------------
+# Real configuration never enters the repository. .env.example is the tracked template.
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+id_rsa
+id_ed25519
+secrets.json
+credentials.json
+
+# --- Python -------------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.import_linter_cache/
+.coverage
+htmlcov/
+
+# --- Node and Next.js ---------------------------------------------------------------------------
+node_modules/
+.next/
+.turbo/
+*.tsbuildinfo
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/versions
+coverage/
+
+# --- Foundry ------------------------------------------------------------------------------------
+out/
+cache/
+broadcast/
+
+# --- The Graph ----------------------------------------------------------------------------------
+generated/
+subgraph/**/build/
+
+# --- Runtime artifacts --------------------------------------------------------------------------
+# Evidence uploads under STORAGE_BACKEND=local, plus logs.
+.data/
+*.log
+logs/
+
+# --- Editors and operating systems ----------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
