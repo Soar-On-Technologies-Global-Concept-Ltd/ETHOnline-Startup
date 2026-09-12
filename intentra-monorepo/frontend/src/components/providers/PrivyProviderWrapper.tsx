@@ -23,7 +23,6 @@ export function PrivyProviderWrapper({ children }: { children: React.ReactNode }
         appearance: {
           theme: "dark",
           accentColor: "#ffffff",
-          logo: "",
         },
         embeddedWallets: {
           ethereum: {
