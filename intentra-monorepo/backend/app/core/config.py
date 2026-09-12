@@ -95,6 +95,21 @@ class Settings(BaseSettings):
     outbox_poll_seconds: float = 2.0
 
     @model_validator(mode="after")
+    def _escrow_is_pinned_outside_dev(self) -> "Settings":
+        """A deployment that never learned where the escrow is, or when it was deployed, fails quietly rather than
+        loudly: the watcher starts at the chain head and simply never sees an event that happened before boot."""
+        if self.env in ("staging", "prod"):
+            problems = []
+            if int(self.escrow_address, 16) == 0:
+                problems.append("ESCROW_ADDRESS is the zero address")
+            if self.escrow_deploy_block <= 0:
+                problems.append("ESCROW_DEPLOY_BLOCK is not set, so the watcher would start at the chain head and "
+                                "miss every event before it")
+            if problems:
+                raise ValueError("; ".join(problems))
+        return self
+
+    @model_validator(mode="after")
     def _no_placeholder_secrets_outside_dev(self) -> "Settings":
         """A deployment that kept the sample secrets would sign evidence URLs and webhooks with a public value."""
         if self.env in ("staging", "prod"):
