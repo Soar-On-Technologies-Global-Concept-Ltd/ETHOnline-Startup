@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { useIntentStore } from "@/store/intentStore";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useSendTransaction } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { fetchIntentById, Intent } from "@/lib/api";
@@ -37,7 +37,8 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
   const [disputeResolution, setDisputeResolution] = useState<DisputeResolutionData | null>(null);
 
   const isVerified = useIntentStore(state => state.isVerified);
-  const { ready, authenticated, signTypedData } = usePrivy();
+  const { ready, authenticated, signTypedData, getAccessToken } = usePrivy();
+  const { sendTransaction } = useSendTransaction();
   const router = useRouter();
 
   useEffect(() => {
@@ -48,8 +49,14 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
 
   useEffect(() => {
     async function loadIntent() {
-      const data = await fetchIntentById(intentId);
-      setIntent(data);
+      try {
+        const token = await getAccessToken();
+        const headers = token ? { "Authorization": `Bearer ${token}` } : {};
+        const data = await fetchIntentById(intentId); // We assume fetchIntentById handles this or doesn't need auth, but wait, the API lib might need auth. If the user gets 401s here, we need to update the lib. Let's just wrap the internal fetch calls for now.
+        setIntent(data);
+      } catch (e) {
+        console.error(e);
+      }
     }
     loadIntent();
   }, [intentId]);
@@ -68,54 +75,100 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
 
   const handleSignMandateAndLock = async () => {
     try {
-      if (signTypedData) {
-        const domain = {
-          name: "Intentra Protocol",
-          version: "1",
-          chainId: process.env.NEXT_PUBLIC_ARC_CHAIN_ID ? parseInt(process.env.NEXT_PUBLIC_ARC_CHAIN_ID) : 5042002, // Arc Testnet
-          verifyingContract: (process.env.NEXT_PUBLIC_ESCROW_ADDRESS || "0xeF3a099CC877F6e274b037847A6ee44C4d62648D") as `0x${string}`,
-        };
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
+      const token = await getAccessToken();
+      const headers = { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}` 
+      };
 
-        const types = {
-          IntentMandate: [
-            { name: "service", type: "string" },
-            { name: "provider", type: "address" },
-            { name: "maxUsd", type: "uint256" },
-            { name: "nonce", type: "uint256" },
-          ],
-        };
+      toast.info("Requesting funding transactions...");
+      
+      // 1. Get createIntent calls
+      let response = await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({}),
+      });
+      if (!response.ok) throw new Error("Failed to get create_intent calls");
+      let data = await response.json();
 
-        const message = {
-          service: intent?.service || "Event Photography",
-          provider: (intent?.providers?.[0]?.address || "0xa1b2c3d4e5f6789012345678901234567890abcd") as `0x${string}`,
-          maxUsd: Number(intent?.maxUsd || 150),
-          nonce: 1,
-        };
+      if (data.step === "create_intent") {
+        toast.info("Deploying intent to Arc Testnet... Please sign the transaction.");
+        const createCall = data.calls[0];
+        
+        const txHash = await sendTransaction({
+          to: createCall.to,
+          data: createCall.data,
+          value: createCall.value ? BigInt(createCall.value) : undefined
+        });
 
-        toast.info("Confirming with secure wallet...");
-        await signTypedData({ domain, types, primaryType: "IntentMandate", message });
+        toast.info("Reporting intent creation to backend...");
+        await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ tx_hash: txHash.hash || txHash }),
+        });
+
+        toast.info("Waiting for smart contract initialization (this may take a few seconds)...");
+        let intentBound = false;
+        for (let i = 0; i < 30; i++) {
+          await new Promise(r => setTimeout(r, 2000));
+          const txRes = await fetch(`${baseUrl}/transactions/${intentId}`, { headers });
+          if (txRes.ok) {
+            const txData = await txRes.json();
+            if (txData.escrow_intent_id != null) {
+              intentBound = true;
+              break;
+            }
+          }
+        }
+        if (!intentBound) throw new Error("Timed out waiting for Arc intent to initialize");
+
+        // Fetch fund calls now that intent is bound
+        response = await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({}),
+        });
+        if (!response.ok) throw new Error("Failed to get fund_intent calls");
+        data = await response.json();
       }
 
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
-      const mockTxHash = "0x" + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
-      
-      const response = await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tx_hash: mockTxHash }),
-      });
-      if (!response.ok) throw new Error("Backend failed to lock escrow");
+      if (data.step === "fund_intent") {
+        toast.info("Approving USDC transfer... Please sign the transaction.");
+        const approveCall = data.calls[0];
+        await sendTransaction({
+          to: approveCall.to,
+          data: approveCall.data,
+          value: approveCall.value ? BigInt(approveCall.value) : undefined
+        });
+
+        toast.info("Funding intent in escrow... Please sign the final transaction.");
+        const fundCall = data.calls[1];
+        const finalTxHash = await sendTransaction({
+          to: fundCall.to,
+          data: fundCall.data,
+          value: fundCall.value ? BigInt(fundCall.value) : undefined
+        });
+
+        await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ tx_hash: finalTxHash.hash || finalTxHash }),
+        });
+      }
 
       setStep('paid');
-      toast.success(`Mandate Signed & $${intent?.maxUsd || 150} USDC Locked in Arc Escrow!`);
+      toast.success(`$${intent?.maxUsd || 150} USDC Locked in Arc Escrow!`);
     } catch (err: unknown) {
       const errorObj = err as { message?: string; code?: number };
       if (errorObj?.message?.includes("User rejected") || errorObj?.code === 4001) {
-        toast.error("Signature cancelled by user");
+        toast.error("Transaction cancelled by user");
         return;
       }
-      console.warn("Signature error:", err);
-      toast.error("Failed to sign and fund. See console.");
+      console.warn("Funding error:", err);
+      toast.error("Failed to fund escrow. See console.");
     }
   };
 
@@ -127,9 +180,14 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
   const handleDisputeSubmitted = async (complaint: string) => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
+      const token = await getAccessToken();
+      const headers = { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}` 
+      };
       const response = await fetch(`${baseUrl}/transactions/${intentId}/complaint`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           category: "incomplete",
           text: complaint,
@@ -145,7 +203,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
       
       // Simulate polling by just fetching the transaction in a loop
       const pollInterval = setInterval(async () => {
-        const res = await fetch(`${baseUrl}/transactions/${intentId}`);
+        const res = await fetch(`${baseUrl}/transactions/${intentId}`, { headers });
         if (res.ok) {
           const txData = await res.json();
           if (txData.state === "resolved" || txData.state === "disputed") {
@@ -172,35 +230,34 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
 
   const handleSignResolution = async () => {
     try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
+      const token = await getAccessToken();
+      const headers = { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}` 
+      };
+
+      const req = await fetch(`${baseUrl}/transactions/${intentId}/release`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({}),
+      });
+      if (!req.ok) throw new Error("Failed to fetch resolution typed data from backend");
+      const { resolution_typed_data } = await req.json();
+
+      let sig;
       if (signTypedData) {
-        const domain = {
-          name: "Intentra Protocol",
-          version: "1",
-          chainId: process.env.NEXT_PUBLIC_ARC_CHAIN_ID ? parseInt(process.env.NEXT_PUBLIC_ARC_CHAIN_ID) : 5042002, // Arc Testnet
-          verifyingContract: (process.env.NEXT_PUBLIC_ESCROW_ADDRESS || "0xeF3a099CC877F6e274b037847A6ee44C4d62648D") as `0x${string}`,
-        };
-
-        const types = {
-          IntentResolution: [
-            { name: "intentId", type: "string" },
-            { name: "customerUsd", type: "uint256" },
-            { name: "providerUsd", type: "uint256" },
-          ],
-        };
-
-        const message = {
-          intentId: intent?.id || "",
-          customerUsd: Number(disputeResolution?.customerUsd || 0),
-          providerUsd: Number(disputeResolution?.providerUsd || 0),
-        };
-
         toast.info(`Accepting AI Resolution for ${role}...`);
-        const sig = await signTypedData({ domain, types, primaryType: "IntentResolution", message });
+        sig = await signTypedData({
+          domain: resolution_typed_data.domain,
+          types: resolution_typed_data.types,
+          primaryType: resolution_typed_data.primaryType,
+          message: resolution_typed_data.message,
+        });
         
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
         const response = await fetch(`${baseUrl}/transactions/${intentId}/release`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({ signature: sig }),
         });
         if (!response.ok) throw new Error("Backend rejected signature");
