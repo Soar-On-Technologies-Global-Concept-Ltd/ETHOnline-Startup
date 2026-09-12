@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FiCommand, FiBriefcase, FiClock, FiSettings, FiX } from "react-icons/fi";
+import { FiCommand, FiBriefcase, FiClock, FiSettings, FiX, FiBookOpen } from "react-icons/fi";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -20,6 +20,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   ];
 
   const bottomLinks = [
+    { name: "Documentation", href: "/docs", icon: FiBookOpen },
     { name: "User Profile", href: "/profile", icon: FiSettings },
   ];
 

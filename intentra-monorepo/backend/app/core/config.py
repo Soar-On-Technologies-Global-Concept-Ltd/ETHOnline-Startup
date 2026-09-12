@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     env: Literal["dev", "test", "staging", "prod"] = "dev"
     database_url: str = "postgresql+asyncpg://intentra@127.0.0.1:5432/intentra"
     database_requires_tls: bool = False   # set from the URL's sslmode; asyncpg takes it as a connect argument
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000", "https://intentra-theta.vercel.app"])
     log_level: str = "INFO"
     public_base_url: str = "http://localhost:8000"
     signing_secret: SecretStr = SecretStr("dev-only-change-me")
