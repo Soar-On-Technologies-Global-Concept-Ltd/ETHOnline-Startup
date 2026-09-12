@@ -51,10 +51,11 @@ Your backend background workers (Celery/Cron) must be aware of the following on-
 
 ## 3. Deployment & Addresses
 
-When testing locally or on Arc testnet, you can run the deployment script:
-```bash
-cd intentra-monorepo/contracts
-forge script script/Deploy.s.sol --rpc-url <URL> --broadcast
-```
+The smart contracts are currently deployed live on the **Arc Testnet** (Chain ID: `5042002`).
 
-This will deploy a `MockUSDC` token and the `IntentraEscrow` contract. Ensure your backend `.env` variables point to these newly generated addresses.
+*   **Mock USDC Token (6 Decimals):** `0xFa5a5744898B71c93fF80F179d95184864143190`
+*   **IntentraEscrow Contract:** `0xeF3a099CC877F6e274b037847A6ee44C4d62648D`
+
+These addresses and the full ABI are exported in `intentra-monorepo/contracts/exports/intentra-contracts.ts`. Ensure your backend `.env` variables and the Graph subgraphs are pointing to these live addresses.
+
+For instructions on how to deploy or interact with the contract using a MetaMask account, please refer to the `README.md` file in this directory.

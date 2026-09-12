@@ -3,7 +3,11 @@
 This directory contains the core smart contracts for the Intentra MVP. 
 
 ## Network
-**Target Network:** Arc Testnet (EVM Compatible)
+**Target Network:** Arc Testnet (Chain ID: `5042002`)
+
+### Live Deployments (Arc Testnet)
+*   **IntentraEscrow:** `0xeF3a099CC877F6e274b037847A6ee44C4d62648D`
+*   **Mock USDC:** `0xFa5a5744898B71c93fF80F179d95184864143190`
 
 ## Deployment Guide (Using MetaMask)
 
