@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Index, Column, String
+from sqlalchemy import BigInteger, Index, Column, String
 from sqlmodel import Field, SQLModel
 
 from app.core.columns import big, jsonb, tstz, utcnow
@@ -13,6 +13,9 @@ class Transaction(SQLModel, table=True):
     __table_args__ = (Index("ix_tx_state_release", "state", "release_after"),)
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     tx_key: str = Field(sa_column=Column(String(66), unique=True, nullable=False))
+    # The escrow assigns this when createIntent lands. Deliberately not called intent_id: that name already
+    # belongs to the Intent this transaction came from, and the two are entirely different identifiers.
+    escrow_intent_id: int | None = Field(default=None, sa_column=Column(BigInteger, unique=True, nullable=True))
     intent_id: uuid.UUID = Field(foreign_key="intents.id", unique=True)
     quote_id: uuid.UUID | None = Field(default=None, foreign_key="quotes.id")
     customer_id: uuid.UUID = Field(foreign_key="users.id", index=True)

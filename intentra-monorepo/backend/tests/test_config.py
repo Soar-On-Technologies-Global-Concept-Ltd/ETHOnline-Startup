@@ -41,6 +41,22 @@ def test_staging_is_held_to_the_same_bar():
         settings(env="staging", signing_secret="dev-only-change-me")
 
 
+def test_production_refuses_an_unset_deploy_block():
+    """Without it the watcher starts at the head, so an event a second old is invisible: silent, not loud."""
+    with pytest.raises(ValidationError, match="ESCROW_DEPLOY_BLOCK"):
+        settings(escrow_deploy_block=0)
+
+
+def test_production_refuses_the_zero_escrow_address():
+    with pytest.raises(ValidationError, match="zero address"):
+        settings(escrow_address="0x" + "00" * 20)
+
+
+def test_the_live_deployment_satisfies_both():
+    live = settings(escrow_address="0xeF3a099CC877F6e274b037847A6ee44C4d62648D", escrow_deploy_block=61_719_028)
+    assert live.escrow_deploy_block == 61_719_028
+
+
 def test_development_keeps_the_convenient_defaults():
     relaxed = settings(env="dev", signing_secret="dev-only-change-me", privy_mode="fake", world_mode="fake",
                        llm_provider="fake")

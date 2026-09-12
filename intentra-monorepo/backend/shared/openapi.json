@@ -701,6 +701,7 @@
           "payments"
         ],
         "summary": "Release the payment to the provider",
+        "description": "Empty body returns the resolution to sign; the signed body queues it for the chain.",
         "operationId": "release_v1_transactions__tx_id__release_post",
         "parameters": [
           {
@@ -735,7 +736,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChainReportIn"
+                "$ref": "#/components/schemas/ReleaseIn"
               }
             }
           }
@@ -1627,6 +1628,37 @@
         },
         "type": "object",
         "title": "RejectIn"
+      },
+      "ReleaseIn": {
+        "properties": {
+          "signature": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{130}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature"
+          },
+          "tx_hash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tx Hash"
+          }
+        },
+        "type": "object",
+        "title": "ReleaseIn",
+        "description": "Paying the provider in full is a resolution on the canonical escrow, so it needs the customer's signature.\n\nSend an empty body to get the typed data, then send it back signed."
       },
       "RespondIn": {
         "properties": {

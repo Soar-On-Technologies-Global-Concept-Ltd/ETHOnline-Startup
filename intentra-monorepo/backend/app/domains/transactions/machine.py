@@ -26,6 +26,12 @@ async def lock_by_key(s: AsyncSession, tx_key: str) -> Transaction | None:
     return (await s.exec(select(Transaction).where(Transaction.tx_key == tx_key.lower()).with_for_update())).one_or_none()
 
 
+async def lock_by_intent_id(s: AsyncSession, intent_id: int) -> Transaction | None:
+    """Chain events arrive keyed by the escrow's intentId."""
+    return (await s.exec(select(Transaction).where(Transaction.escrow_intent_id == int(intent_id))
+                         .with_for_update())).one_or_none()
+
+
 def can(tx: Transaction, event: Event) -> bool:
     return next_state(TxState(tx.state), event) is not None
 

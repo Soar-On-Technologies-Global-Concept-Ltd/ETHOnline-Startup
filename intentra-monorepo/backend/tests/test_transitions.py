@@ -24,7 +24,7 @@ def test_the_happy_path_runs_end_to_end():
     state = TxState.CREATED
     for event in (Event.INTENT_STRUCTURED, Event.QUOTE_SELECTED, Event.AUTHORIZATION_ISSUED, Event.AUTHORIZED,
                   Event.FUNDING_STARTED, Event.FUNDED_ONCHAIN, Event.WORK_STARTED, Event.EVIDENCE_ADDED,
-                  Event.DELIVERED_ONCHAIN, Event.RELEASED_ONCHAIN):
+                  Event.DELIVERY_MARKED, Event.RELEASED_ONCHAIN):
         state = next_state(state, event)
         assert state is not None
     assert state is TxState.RELEASED
@@ -50,9 +50,10 @@ def test_every_pre_funding_state_can_be_cancelled():
 
 
 def test_money_states_only_commit_on_chain_events():
-    chain_only = {Event.FUNDED_ONCHAIN, Event.DELIVERED_ONCHAIN, Event.RELEASED_ONCHAIN, Event.DISPUTE_OPENED_ONCHAIN,
+    chain_only = {Event.FUNDED_ONCHAIN, Event.DELIVERY_MARKED, Event.RELEASED_ONCHAIN, Event.DISPUTE_OPENED_ONCHAIN,
                   Event.SETTLED_ONCHAIN, Event.REFUNDED_ONCHAIN}
-    money_states = {TxState.FUNDED, TxState.DELIVERED, TxState.RELEASED, TxState.DISPUTED, TxState.SETTLED}
+    # DELIVERED is a workflow state: no money moves, and the canonical escrow has no delivery call.
+    money_states = {TxState.FUNDED, TxState.RELEASED, TxState.DISPUTED, TxState.SETTLED}
     for (_, event), to in TRANSITIONS.items():
         if to in money_states:
             assert event in chain_only, f"{to} must commit on a chain event, not {event}"

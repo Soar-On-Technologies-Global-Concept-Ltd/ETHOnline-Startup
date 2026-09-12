@@ -3,7 +3,7 @@ import asyncio
 import logging
 
 from app.core.logging import log
-from app.workers import blockchain, evidence, reconciliation
+from app.workers import blockchain, reconciliation
 from app.workers.leader import Leadership
 
 logger = logging.getLogger("workers")
@@ -22,8 +22,7 @@ def is_leader() -> bool:
 async def _start_loops() -> None:
     _tasks.extend([asyncio.create_task(blockchain.run_watcher(_stop), name="watcher"),
                    asyncio.create_task(blockchain.run_outbox(_stop), name="outbox"),
-                   asyncio.create_task(reconciliation.run(_stop), name="reconciliation"),
-                   asyncio.create_task(evidence.run(_stop), name="anchors")])
+                   asyncio.create_task(reconciliation.run(_stop), name="reconciliation")])
     log(logger, "workers started", loops=[t.get_name() for t in _tasks])
 
 

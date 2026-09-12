@@ -1,9 +1,23 @@
 {
-  "domain": {
-    "name": "Intentra",
-    "version": "1",
-    "chainId": 5042002,
-    "verifyingContract": "<ESCROW_ADDRESS>"
+  "note": "ResolveIntent is the contract's own type and must match IntentraEscrow.sol. Authorization is Intentra's off-chain mandate: the escrow never sees it.",
+  "addresses": {
+    "escrow": "0xeF3a099CC877F6e274b037847A6ee44C4d62648D",
+    "usdc": "0xFa5a5744898B71c93fF80F179d95184864143190",
+    "chainId": 5042002
+  },
+  "domains": {
+    "contract": {
+      "name": "IntentraEscrow",
+      "version": "1",
+      "chainId": 5042002,
+      "verifyingContract": "0xeF3a099CC877F6e274b037847A6ee44C4d62648D"
+    },
+    "mandate": {
+      "name": "Intentra",
+      "version": "1",
+      "chainId": 5042002,
+      "verifyingContract": "0xeF3a099CC877F6e274b037847A6ee44C4d62648D"
+    }
   },
   "types": {
     "EIP712Domain": [
@@ -50,18 +64,18 @@
         "type": "uint64"
       }
     ],
-    "Resolution": [
+    "ResolveIntent": [
       {
-        "name": "txKey",
-        "type": "bytes32"
+        "name": "intentId",
+        "type": "uint256"
       },
       {
-        "name": "providerBps",
-        "type": "uint16"
+        "name": "customerAmount",
+        "type": "uint256"
       },
       {
-        "name": "outcomeHash",
-        "type": "bytes32"
+        "name": "providerAmount",
+        "type": "uint256"
       }
     ]
   }

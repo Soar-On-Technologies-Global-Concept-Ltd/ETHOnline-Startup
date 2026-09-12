@@ -20,11 +20,14 @@ RESOLVER_LOCK = asyncio.Lock()
 WAKE = asyncio.Event()
 
 CALLS = {
-    "ANCHOR": ("anchorEvidence", lambda a: [hex_to_bytes(a["tx_key"]), hex_to_bytes(a["evidence_hash"])]),
-    "OPEN_DISPUTE": ("openDispute", lambda a: [hex_to_bytes(a["tx_key"]), hex_to_bytes(a["complaint_hash"])]),
-    "RELEASE": ("release", lambda a: [hex_to_bytes(a["tx_key"])]),
-    "RESOLVE": ("resolve", lambda a: [hex_to_bytes(a["tx_key"]), int(a["provider_bps"]), hex_to_bytes(a["outcome_hash"]),
-                                      hex_to_bytes(a["sig_customer"]), hex_to_bytes(a["sig_provider"])]),
+    # Everything the arbitrator key may send. It can propose a split and relay a signed resolution; it can never
+    # move money on its own, because executeWithSignatures needs two distinct signers.
+    "AI_PROPOSAL": ("submitAIProposal", lambda a: [int(a["intent_id"]), int(a["customer_amount"]),
+                                                   int(a["provider_amount"])]),
+    "EXECUTE": ("executeWithSignatures", lambda a: [int(a["intent_id"]), int(a["customer_amount"]),
+                                                    int(a["provider_amount"]), hex_to_bytes(a["sig_a"]),
+                                                    hex_to_bytes(a["sig_b"])]),
+    "ABANDONMENT": ("executeAbandonment", lambda a: [int(a["intent_id"])]),
 }
 
 
@@ -67,7 +70,15 @@ async def send_next() -> list | None:
                                 .with_for_update(skip_locked=True).limit(1))).first()
             if row is None:
                 return None
-            fn_name, build_args = CALLS[row.kind]
+            call = CALLS.get(row.kind)
+            if call is None:
+                # A kind this backend no longer sends: ANCHOR, OPEN_DISPUTE and RESOLVE went with the old escrow.
+                # Retire the row rather than raising, or one stale row wedges the sender for every other one.
+                row.status, row.error = "FAILED", f"{row.kind} is not a call this backend makes any more"
+                s.add(row)
+                log(logger, "outbox row retired", kind=row.kind, id=row.id)
+                return []
+            fn_name, build_args = call
             row.attempts += 1
             try:
                 max_fee, priority = await _fees()
