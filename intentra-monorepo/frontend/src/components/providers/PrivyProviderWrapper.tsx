@@ -35,8 +35,8 @@ export function PrivyProviderWrapper({ children }: { children: React.ReactNode }
       config={{
         loginMethods: ["email"],
         appearance: {
-          theme: "#000000",
-          accentColor: "#00ff00",
+          theme: "dark",
+          accentColor: "#22c55e",
           logo: "",
         },
         embeddedWallets: {
