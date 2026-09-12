@@ -63,6 +63,14 @@ async def get(s: AsyncSession, transaction_id: uuid.UUID) -> Transaction:
     return tx
 
 
+async def by_intent(s: AsyncSession, intent_id: uuid.UUID) -> Transaction:
+    """The read counterpart of by_intent_locked: a screen refresh must not take a row lock the workers wait on."""
+    tx = (await s.exec(select(Transaction).where(Transaction.intent_id == intent_id))).one_or_none()
+    if tx is None:
+        raise NotFound("request not found")
+    return tx
+
+
 async def by_intent_locked(s: AsyncSession, intent_id: uuid.UUID) -> Transaction:
     tx = (await s.exec(select(Transaction).where(Transaction.intent_id == intent_id).with_for_update())).one_or_none()
     if tx is None:

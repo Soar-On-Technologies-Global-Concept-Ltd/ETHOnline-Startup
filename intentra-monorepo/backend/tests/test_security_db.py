@@ -324,3 +324,35 @@ async def test_evidence_is_refused_before_the_job_starts(client, parties, fake_l
                                  files={"file": ("after.jpg", photo(), "image/jpeg")},
                                  data={"kind": "AFTER_PHOTO", "scope_item": "bedroom_1"})
     assert response.status_code == 409 and response.json()["error"]["code"] == "illegal_transition"
+
+
+async def test_a_request_can_be_read_back_by_its_id(client, parties, fake_llm):
+    """The client that only kept the intent id has to be able to recover the transaction id: every later call in
+    the flow is addressed by it, and without this route the screen 404s on refresh."""
+    created = (await client.post("/v1/intents", json={"text": "Paint a 2-bedroom in Surulere under ₦180k this Saturday"},
+                                 headers=auth(ADA_TOKEN))).json()
+    response = await client.get(f"/v1/intents/{created['intent_id']}", headers=auth(ADA_TOKEN))
+    assert response.status_code == 200
+    body = response.json()
+    assert body["intent_id"] == created["intent_id"]
+    assert body["transaction_id"] == created["transaction_id"]
+    assert body["spec"] == created["spec"] and body["state"] == created["state"]
+
+
+async def test_someone_elses_request_reads_as_missing(client, parties, fake_llm):
+    """404, not 403: Mallory never learns the request exists."""
+    created = (await client.post("/v1/intents", json={"text": "Paint a 2-bedroom in Surulere under ₦180k this Saturday"},
+                                 headers=auth(ADA_TOKEN))).json()
+    response = await client.get(f"/v1/intents/{created['intent_id']}", headers=auth(MALLORY_TOKEN))
+    assert response.status_code == 404
+
+
+async def test_reading_an_unknown_request_is_a_clean_404(client, parties, fake_llm):
+    response = await client.get(f"/v1/intents/{uuid.uuid4()}", headers=auth(ADA_TOKEN))
+    assert response.status_code == 404
+
+
+async def test_reading_a_request_needs_a_token(client, parties, fake_llm):
+    created = (await client.post("/v1/intents", json={"text": "Paint a 2-bedroom in Surulere under ₦180k this Saturday"},
+                                 headers=auth(ADA_TOKEN))).json()
+    assert (await client.get(f"/v1/intents/{created['intent_id']}")).status_code == 401

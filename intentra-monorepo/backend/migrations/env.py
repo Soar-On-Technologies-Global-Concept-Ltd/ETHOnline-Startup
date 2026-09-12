@@ -34,7 +34,8 @@ def _run(connection) -> None:
 
 
 async def run_migrations_online() -> None:
-    engine = create_async_engine(database_url(), pool_pre_ping=True)
+    connect_args = {"ssl": "require"} if get_settings().database_requires_tls else {}
+    engine = create_async_engine(database_url(), pool_pre_ping=True, connect_args=connect_args)
     async with engine.connect() as connection:
         await connection.run_sync(_run)
         await connection.commit()

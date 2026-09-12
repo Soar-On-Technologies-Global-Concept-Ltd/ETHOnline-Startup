@@ -3,8 +3,23 @@ from app.core.db import session_scope, sessionmaker
 from app.domains.identity.models import User
 from app.domains.providers import service as providers
 from app.core.errors import Conflict
+from sqlmodel import SQLModel
+from app.core.db import get_engine, dispose_engine
 
 pytestmark = pytest.mark.db
+
+TABLES = ("audit_events, blockchain_events, resolution_acceptances, resolution_proposals, disputes, complaints, evidence, "
+          "chain_txs, idempotency_keys, fulfillments, payments, authorizations, human_checks, transactions, quotes, "
+          "intents, providers, users, kv_cursors")
+
+@pytest.fixture
+async def db():
+    engine = get_engine()
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+        await conn.exec_driver_sql(f"TRUNCATE {TABLES} RESTART IDENTITY CASCADE")
+    yield
+    await dispose_engine()
 
 @pytest.fixture
 async def unseeded_user(db):

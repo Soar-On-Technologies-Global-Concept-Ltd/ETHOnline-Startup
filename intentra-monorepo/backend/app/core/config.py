@@ -1,6 +1,7 @@
 """Settings from the environment (section 20.1 of the schematics). Refuses to start with unsafe test fakes outside dev or test."""
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -8,12 +9,33 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PLACEHOLDER_SECRETS = {"dev-only-change-me", "change-me", "changeme", "secret"}
 
+# Managed Postgres (Render, Heroku, Fly, Neon) hands out a libpq URL. Two things in it break this app: the driver
+# resolves to psycopg2, which the image does not install, and libpq-only query parameters make asyncpg raise
+# TypeError on connect. Both surface as a boot crash on the platform and never locally, so normalise on the way in.
+ASYNCPG_SCHEMES = {"postgres", "postgresql", "postgresql+psycopg2", "postgresql+psycopg"}
+LIBPQ_ONLY_PARAMS = {"sslmode", "channel_binding", "gssencmode", "target_session_attrs"}
+TLS_SSLMODES = {"require", "verify-ca", "verify-full"}
+
+
+def normalise_database_url(raw: str) -> tuple[str, bool]:
+    """Return (url asyncpg can open, whether the URL asked for TLS)."""
+    parts = urlsplit(raw)
+    scheme = "postgresql+asyncpg" if parts.scheme in ASYNCPG_SCHEMES else parts.scheme
+    kept, requires_tls = [], False
+    for key, value in parse_qsl(parts.query, keep_blank_values=True):
+        if key == "sslmode":
+            requires_tls = value in TLS_SSLMODES
+        elif key not in LIBPQ_ONLY_PARAMS:
+            kept.append((key, value))
+    return urlunsplit((scheme, parts.netloc, parts.path, urlencode(kept), parts.fragment)), requires_tls
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     env: Literal["dev", "test", "staging", "prod"] = "dev"
     database_url: str = "postgresql+asyncpg://intentra@127.0.0.1:5432/intentra"
+    database_requires_tls: bool = False   # set from the URL's sslmode; asyncpg takes it as a connect argument
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000", "https://intentra-theta.vercel.app"])
     log_level: str = "INFO"
     public_base_url: str = "http://localhost:8000"
@@ -94,6 +116,12 @@ class Settings(BaseSettings):
     watch_interval_seconds: float = 3.0
     reconcile_interval_seconds: float = 15.0
     outbox_poll_seconds: float = 2.0
+
+    @model_validator(mode="after")
+    def _database_url_is_one_asyncpg_can_open(self) -> "Settings":
+        self.database_url, requires_tls = normalise_database_url(self.database_url)
+        self.database_requires_tls = self.database_requires_tls or requires_tls
+        return self
 
     @model_validator(mode="after")
     def _escrow_is_pinned_outside_dev(self) -> "Settings":
