@@ -1,68 +1,39 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
 
-export default function Home() {
+import { usePrivy } from "@privy-io/react-auth";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+
+export default function LandingPage() {
+  const { login, ready, authenticated } = usePrivy();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (ready && authenticated) {
+      router.push("/dashboard/consumer");
+    }
+  }, [ready, authenticated, router]);
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+    <div className="min-h-screen bg-background flex flex-col">
+      <nav className="border-b border-border bg-surface px-6 py-4 flex justify-between items-center">
+        <div className="text-xl font-display font-bold text-foreground tracking-tight">Intentra</div>
+        <PrimaryButton variant="secondary" className="px-4 py-2 text-sm" onClick={login} disabled={!ready}>
+          {authenticated ? "Enter App" : "Connect"}
+        </PrimaryButton>
+      </nav>
+
+      <main className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20">
+        <h1 className="max-w-4xl font-display text-5xl md:text-7xl font-bold tracking-tight text-foreground mb-6">
+          AI can find a provider. <br className="hidden md:block"/> It cannot create authority.
+        </h1>
+        <p className="max-w-2xl text-lg md:text-xl text-text-muted mb-10">
+          An AI-mediated service marketplace secured by cryptographic escrow and human verification.
+        </p>
+        <PrimaryButton variant="primary" className="text-lg px-8 py-4" onClick={login} disabled={!ready}>
+          Start a Transaction
+        </PrimaryButton>
       </main>
     </div>
   );
