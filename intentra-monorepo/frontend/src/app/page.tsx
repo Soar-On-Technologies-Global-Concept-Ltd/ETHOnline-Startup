@@ -52,11 +52,11 @@ export default function LandingPage() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
-          className="font-display text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight text-foreground leading-[1.1] sm:leading-[1.08] mb-4 max-w-3xl"
+          className="font-display text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight text-foreground leading-[1.1] sm:leading-[1.08] mb-4 max-w-4xl"
         >
-          AI prepares. <br className="hidden sm:inline"/>
+          Hire verified professionals. <br className="hidden sm:inline"/>
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white/80 to-white/40">
-            Humans authorize.
+            Let AI handle the negotiation.
           </span>
         </motion.h1>
 
@@ -67,7 +67,7 @@ export default function LandingPage() {
           transition={{ duration: 0.4, delay: 0.15 }}
           className="max-w-xl text-xs sm:text-sm text-text-muted mb-8 leading-relaxed font-normal px-2"
         >
-          An AI-mediated service marketplace secured by EIP-712 spending mandates, World ID human verification, and Arc USDC escrow.
+          A decentralized service marketplace where AI finds the perfect provider, World ID verifies their humanity, and Arc USDC escrows your funds.
         </motion.p>
 
         {/* Action Button */}
@@ -91,26 +91,26 @@ export default function LandingPage() {
           className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4 text-left w-full max-w-4xl"
         >
           <SolidCard variant="glass" className="p-4 sm:p-5 rounded-lg">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-text-muted block mb-1.5 font-semibold">01 / Authority</span>
-            <h3 className="font-display font-semibold text-sm mb-1.5">EIP-712 Mandates</h3>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-text-muted block mb-1.5 font-semibold">01 / Discovery</span>
+            <h3 className="font-display font-semibold text-sm mb-1.5">AI-Driven Matching</h3>
             <p className="text-[11px] text-text-muted leading-relaxed font-sans">
-              Explicit cryptographic signatures enforce strict budget caps (max $150).
+              Describe your need and budget. Our AI instantly parses your intent and finds the perfect provider, secured by EIP-712 mandates.
             </p>
           </SolidCard>
 
           <SolidCard variant="glass" className="p-4 sm:p-5 rounded-lg">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-text-muted block mb-1.5 font-semibold">02 / Identity</span>
-            <h3 className="font-display font-semibold text-sm mb-1.5">World Selfie Check</h3>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-text-muted block mb-1.5 font-semibold">02 / Trust</span>
+            <h3 className="font-display font-semibold text-sm mb-1.5">World ID Verification</h3>
             <p className="text-[11px] text-text-muted leading-relaxed font-sans">
-              Biometric proof of humanity at funding & dispute steps prevents bot drain.
+              Zero bots, zero scams. Every provider proves their humanity cryptographically via World Selfie Check.
             </p>
           </SolidCard>
 
           <SolidCard variant="glass" className="p-4 sm:p-5 rounded-lg">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-text-muted block mb-1.5 font-semibold">03 / Settlement</span>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-text-muted block mb-1.5 font-semibold">03 / Security</span>
             <h3 className="font-display font-semibold text-sm mb-1.5">Arc Testnet Escrow</h3>
             <p className="text-[11px] text-text-muted leading-relaxed font-sans">
-              USDC locked in smart contract until photo evidence or AI split resolution.
+              Your USDC funds are securely locked in a smart contract escrow until the job is completed and approved.
             </p>
           </SolidCard>
         </motion.div>
