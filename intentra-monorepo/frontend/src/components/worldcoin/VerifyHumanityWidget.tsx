@@ -85,7 +85,7 @@ export function VerifyHumanityWidget({ action }: { action: string }) {
       <IDKitRequestWidget
         open={open}
         onOpenChange={setOpen}
-        app_id={process.env.NEXT_PUBLIC_WORLD_ID_APP_ID}
+        app_id={(process.env.NEXT_PUBLIC_WORLD_ID_APP_ID || "app_staging_default") as `app_${string}`}
         action={action}
         rp_context={rpContext}
         allow_legacy_proofs={true}
