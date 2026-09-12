@@ -20,8 +20,10 @@ STATUS: dict[TxState, tuple[str, str]] = {
     TxState.FUNDED: ("Payment protected. Your provider can start.", "The money is locked in escrow. You can start the job."),
     TxState.IN_PROGRESS: ("The job is in progress.", "Upload an after-photo for each room when you finish."),
     TxState.EVIDENCE_SUBMITTED: ("Your provider is uploading proof of the work.", "Add the remaining photos, then mark the job delivered."),
-    TxState.DELIVERED: ("The job is marked done. Release the payment, or report a problem before the window closes.",
-                        "Delivered. The payment releases when the customer confirms or the window closes."),
+    # Nothing auto-releases on the canonical escrow: the money waits for the customer's signature, or for the
+    # contract's own 14-day abandonment timeout. The copy must not promise a window that releases.
+    TxState.DELIVERED: ("The job is marked done. Release the payment, or report a problem.",
+                        "Delivered. You are paid once the customer releases the payment."),
     TxState.RELEASED: ("Payment released to your provider.", "Payment released to you."),
     TxState.DISPUTED: ("The payment is frozen while your complaint is reviewed.", "The customer reported a problem. Respond with your side and any photos."),
     TxState.RESOLVING: ("Intentra is reviewing both sides.", "Intentra is reviewing both sides."),

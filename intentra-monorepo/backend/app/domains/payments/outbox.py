@@ -70,7 +70,15 @@ async def send_next() -> list | None:
                                 .with_for_update(skip_locked=True).limit(1))).first()
             if row is None:
                 return None
-            fn_name, build_args = CALLS[row.kind]
+            call = CALLS.get(row.kind)
+            if call is None:
+                # A kind this backend no longer sends: ANCHOR, OPEN_DISPUTE and RESOLVE went with the old escrow.
+                # Retire the row rather than raising, or one stale row wedges the sender for every other one.
+                row.status, row.error = "FAILED", f"{row.kind} is not a call this backend makes any more"
+                s.add(row)
+                log(logger, "outbox row retired", kind=row.kind, id=row.id)
+                return []
+            fn_name, build_args = call
             row.attempts += 1
             try:
                 max_fee, priority = await _fees()

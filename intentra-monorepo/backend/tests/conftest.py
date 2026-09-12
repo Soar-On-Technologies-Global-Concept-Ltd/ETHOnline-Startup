@@ -1,11 +1,13 @@
 """Test defaults: fake partners, the local test database, and no background workers."""
 import os
 
-os.environ.setdefault("ENV", "test")
-os.environ.setdefault("PRIVY_MODE", "fake")
-os.environ.setdefault("WORLD_MODE", "fake")
-os.environ.setdefault("LLM_PROVIDER", "fake")
-os.environ.setdefault("WORKERS_ENABLED", "false")
+# Forced, not defaulted: a shell with ENV=dev exported must not silently run the suite in dev mode, which would
+# leave the dev-only chain simulator reachable and quietly weaken the tests that prove it is not.
+os.environ["ENV"] = "test"
+os.environ["PRIVY_MODE"] = "fake"
+os.environ["WORLD_MODE"] = "fake"
+os.environ["LLM_PROVIDER"] = "fake"
+os.environ["WORKERS_ENABLED"] = "false"
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://intentra@127.0.0.1:55432/intentra_test")
 os.environ.setdefault("ESCROW_ADDRESS", "0xeF3a099CC877F6e274b037847A6ee44C4d62648D")
 # The AI arbitrator: one of the escrow's three signers. A throwaway key, and never enough on its own.
