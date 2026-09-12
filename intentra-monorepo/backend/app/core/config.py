@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     arc_rpc_url: str = "https://rpc.testnet.arc.io"
     arc_chain_id: int = 5042002
     escrow_address: str = "0xeF3a099CC877F6e274b037847A6ee44C4d62648D"   # live on Arc testnet
-    escrow_deploy_block: int = 0
+    escrow_deploy_block: int = 61719028   # the block IntentraEscrow was deployed in
     usdc_address: str = "0xFa5a5744898B71c93fF80F179d95184864143190"     # the escrow's 6-decimal mock USDC
     resolver_private_key: SecretStr | None = None   # the AI arbitrator key: one of the three signers
     confirmations: int = 1

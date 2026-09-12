@@ -13,8 +13,13 @@ class DecodedLog:
     log_index: int
     block_number: int
     contract: str
-    tx_key: str
+    tx_key: str          # the escrow's intentId as a string: what blockchain_events records
     args: dict
+
+    @property
+    def intent_id(self) -> int | None:
+        value = self.args.get("intentId")
+        return None if value is None else int(value)
 
 
 def _hex(value) -> str:
@@ -48,4 +53,6 @@ async def decode(log) -> DecodedLog | None:
     args = {k: (_hex(v) if isinstance(v, (bytes, bytearray)) else (v.lower() if isinstance(v, str) and v.startswith("0x") else v))
             for k, v in dict(event["args"]).items()}
     return DecodedLog(name=name, tx_hash=_hex(log["transactionHash"]).lower(), log_index=int(log["logIndex"]),
-                      block_number=int(log["blockNumber"]), contract=str(log["address"]).lower(), tx_key=args["txKey"].lower(), args=args)
+                      block_number=int(log["blockNumber"]), contract=str(log["address"]).lower(),
+                      # The canonical escrow keys everything on intentId; the escrow's own admin events carry none.
+                      tx_key=str(args.get("intentId", "")), args=args)

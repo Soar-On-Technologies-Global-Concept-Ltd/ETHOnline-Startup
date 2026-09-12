@@ -1,39 +1,33 @@
-"""Plain-language status lines and fallback texts. Templates first, so every screen has words even when the model is unavailable."""
+"""Plain-language explanations. Templates first, so every screen has words even when the model is unavailable.
 
-STATUS = {
-    "CREATED": ("Tell us what you need done.", "—"),
-    "INTENT_STRUCTURED": ("Pick a provider to continue.", "—"),
-    "QUOTE_SELECTED": ("Review the job and approve the payment.", "Waiting for the customer to approve."),
-    "AWAITING_AUTHORIZATION": ("Review the job and approve the payment.", "Waiting for the customer to approve."),
-    "AUTHORIZED": ("Approved. Fund the escrow to protect the payment.", "Approved. Waiting for the customer to fund the escrow."),
-    "FUNDING": ("Confirming your payment on Arc…", "Confirming the customer's payment on Arc…"),
-    "FUNDED": ("Payment protected. Your provider can start.", "The money is locked in escrow. You can start the job."),
-    "IN_PROGRESS": ("The job is in progress.", "Upload an after-photo for each room when you finish."),
-    "EVIDENCE_SUBMITTED": ("Your provider is uploading proof of the work.", "Add the remaining photos, then mark the job delivered."),
-    "DELIVERED": ("The job is marked done. Release the payment, or report a problem before the window closes.",
-                  "Delivered. The payment releases when the customer confirms or the window closes."),
-    "RELEASED": ("Payment released to your provider.", "Payment released to you."),
-    "DISPUTED": ("The payment is frozen while your complaint is reviewed.", "The customer reported a problem. Respond with your side and any photos."),
-    "RESOLVING": ("Intentra is reviewing both sides.", "Intentra is reviewing both sides."),
-    "PROPOSED": ("A resolution is ready. Review it and sign, or reject it.", "A resolution is ready. Review it and sign, or reject it."),
-    "SETTLED": ("Settled on Arc as both of you agreed.", "Settled on Arc as both of you agreed."),
-    "ESCALATED": ("A person from Intentra will review this. The money stays frozen.", "A person from Intentra will review this. The money stays frozen."),
-    "CANCELLED": ("This job was cancelled.", "This job was cancelled."),
-}
+The per-state status wording lives in app/core/status_copy.py.
+"""
+from app.core.status_copy import CANCELLED_REFUNDED, STATUS
 
 
 def status_line(state: str, role: str, close_reason: str | None = None) -> str:
+    """The one sentence this role sees for this state.
+
+    An unknown state renders as "" on purpose: a state added to the machine before its copy is written should
+    leave a screen blank, not break it.
+    """
     if state == "CANCELLED" and close_reason == "refunded":
-        return "The escrow refunded the customer because the job was not delivered in time."
+        return CANCELLED_REFUNDED
     customer, provider = STATUS.get(state, ("", ""))
     return provider if role == "provider" else customer
 
 
 def naira(minor: int) -> str:
+    """Kobo to a display string. Money is integer minor units everywhere; this is the only place it becomes text."""
     return f"₦{minor // 100:,}"
 
 
 def rec_text(quote: dict, request: dict) -> dict:
+    """Template reason for recommending a provider, used when the model is unavailable or declines.
+
+    Each branch says only what the trust data actually supports, so a missing subgraph reads as "unavailable"
+    rather than as a low score. Both fields are capped at 160 characters to match the model-written version.
+    """
     trust = quote["trust"]
     price = naira(quote["price_minor"])
     if trust["source"] == "unavailable":
@@ -48,6 +42,7 @@ def rec_text(quote: dict, request: dict) -> dict:
     return {"why": why[:160], "trade_offs": trade[:160]}
 
 
+# Fixed wording for each remedy. The dispute ladder picks a remedy; it never writes the sentence that explains it.
 RATIONALES = {
     "RELEASE_FULL": "The provider's photos cover every item in the agreed scope and the complaint does not show missing work, so the full payment goes to the provider.",
     "SPLIT_70_30": "The after-photos show most of the agreed work was done, and the complaint credibly shows one part falls short of the scope. "

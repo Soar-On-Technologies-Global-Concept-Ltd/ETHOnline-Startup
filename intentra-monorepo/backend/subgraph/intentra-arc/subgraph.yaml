@@ -10,7 +10,7 @@ dataSources:
     source:
       address: "0xeF3a099CC877F6e274b037847A6ee44C4d62648D"   # live on Arc testnet
       abi: IntentraEscrow
-      startBlock: 0                                            # set to the deploy block before deploying
+      startBlock: 61719028
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
