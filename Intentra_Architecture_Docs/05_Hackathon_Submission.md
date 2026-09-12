@@ -59,7 +59,9 @@ Because AI arbitration introduces the risk of prompt injection or manipulation (
 
 1. **The Sybil Defense (World ID):** To prevent griefing (an attacker opening 1,000 disputes to freeze provider funds), a user must pass a biometric World ID Selfie Check to file a dispute.
 2. **The Reputation Defense (The Graph):** The Graph indexes all disputes and completed jobs on-chain. If a customer or provider has a high dispute rate, their Trust Score mathematically drops, and the AI will stop recommending them.
-3. **The Escrow Defense (2-of-3 Multisig):** The AI cannot unilaterally move funds. The smart contract requires two cryptographic signatures to release funds (e.g., AI + Customer, or AI + Provider). If the AI is manipulated and proposes a bad split, the honest party simply refuses to sign, causing a safe deadlock that falls back to a Human Oracle.
+3. **The Escrow Defense (2-of-3 Multisig):** The AI cannot unilaterally move funds. The smart contract requires two cryptographic signatures to release funds (e.g., AI + Customer, or AI + Provider).
+4. **"Appeal the AI" Timelock:** If the AI is manipulated and proposes a bad split, it does not execute instantly. It enters a 48-hour timelock. The honest party can click "Appeal AI Decision" to freeze the AI's signature and escalate to a Human Oracle.
+5. **Abandonment Timeout (The "Disappearance" Fallback):** If one party signs a resolution but the other party completely abandons the app (e.g., loses internet, or vanishes), a 14-day default timeout expires. The Smart Contract or Oracle automatically executes the standing resolution to prevent funds from being stuck forever.
 
 *(Note: For the hackathon MVP, we use a centralized `AgentService` to simulate the AI arbitrator. In our post-hackathon production roadmap, this is replaced by **GenLayer** or a decentralized oracle network to guarantee the AI reasoning itself is trustless and decentralized).*
 
