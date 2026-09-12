@@ -1,45 +1,62 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-:root { /* Light Mode (Default) - Clean & Trusted */
-  --background: #F8FAFC; 
-  --surface: #FFFFFF; 
-  --surface-hover: #F1F5F9;
-  --border: #E2E8F0;
+@theme {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-text-muted: var(--text-muted);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+}
+
+:root { /* Light Mode (Studio White Base) */
+  --background: #FFFFFF; 
+  --surface: #F4F4F5; 
+  --surface-hover: #E4E4E7;
+  --border: #E5E7EB;
   
-  --foreground: #0F172A; /* Ink Navy */
-  --text-muted: #475569; /* Slate Gray */
+  --foreground: #000000; 
+  --text-muted: #52525B; 
   
-  /* Brand Colors (Solid Accents) */
-  --primary: #6D28D9; /* Deep Royal Purple (AI) */
-  --secondary: #059669; /* Emerald Green (Escrow) */
+  --primary: #000000; 
+  --primary-foreground: #FFFFFF;
+  --secondary: #18181B; 
   
-  /* Status Colors */
   --success: #059669;
-  --warning: #D97706; /* Burnt Amber (Disputes) */
+  --warning: #D97706; 
   --danger: #DC2626;
 }
 
-.dark { /* Dark Mode - Sleek & Cyber */
-  --background: #0D111A; /* Deep Obsidian */
-  --surface: #1A202C; /* Charcoal */
-  --surface-hover: #2D3748;
-  --border: #2D3748;
+.dark { /* Dark Mode (Pitch Black Base) */
+  --background: #000000; 
+  --surface: #111111; 
+  --surface-hover: #222222;
+  --border: #27272A; /* Crisp razor thin border */
   
-  --foreground: #F3F4F6; /* Cool Gray */
-  --text-muted: #9CA3AF; /* Muted Gray */
+  --foreground: #FFFFFF; 
+  --text-muted: #A1A1AA; 
   
-  --primary: #8B5CF6; /* Electric Violet (AI) */
-  --secondary: #10B981; /* Neon Mint (Escrow) */
+  --primary: #FFFFFF; 
+  --primary-foreground: #000000;
+  --secondary: #27272A; 
   
   --success: #10B981;
-  --warning: #F59E0B; /* Amber Gold (Disputes) */
+  --warning: #F59E0B; 
   --danger: #EF4444; 
 }
 
 @layer base {
   body {
-    @apply bg-background text-foreground antialiased;
+    background-color: var(--background);
+    color: var(--foreground);
   }
 }
