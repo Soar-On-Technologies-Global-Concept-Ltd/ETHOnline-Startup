@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { SolidCard } from "@/components/ui/SolidCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { FiUpload as Upload } from "react-icons/fi";
 import { toast } from "sonner";

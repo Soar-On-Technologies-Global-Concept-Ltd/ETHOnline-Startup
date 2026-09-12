@@ -164,7 +164,8 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
           }
         }
       }, 3000);
-    } catch (e) {
+    } catch (err) {
+      console.error("Dispute filing failed", err);
       toast.error("Failed to file dispute with backend");
     }
   };
