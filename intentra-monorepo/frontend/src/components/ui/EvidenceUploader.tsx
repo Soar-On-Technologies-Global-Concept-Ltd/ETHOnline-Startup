@@ -4,13 +4,17 @@ import * as React from "react";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { FiUpload as Upload } from "react-icons/fi";
 import { toast } from "sonner";
+import { usePrivy } from "@privy-io/react-auth";
+import { API_BASE_URL } from "@/lib/api";
 
 interface EvidenceUploaderProps {
-  intentId: string;
+  /** The transaction id. Evidence hangs off the transaction, not the intent. */
+  transactionId: string;
   onEvidenceSubmitted: (hash: string) => void;
 }
 
-export function EvidenceUploader({ intentId, onEvidenceSubmitted }: EvidenceUploaderProps) {
+export function EvidenceUploader({ transactionId, onEvidenceSubmitted }: EvidenceUploaderProps) {
+  const { getAccessToken } = usePrivy();
   const [isUploading, setIsUploading] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
 
@@ -32,9 +36,10 @@ export function EvidenceUploader({ intentId, onEvidenceSubmitted }: EvidenceUplo
       formData.append("file", selectedFile);
       formData.append("kind", "AFTER_PHOTO");
       
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
-      const response = await fetch(`${baseUrl}/evidence/transactions/${intentId}/evidence`, {
+      const token = await getAccessToken();
+      const response = await fetch(`${API_BASE_URL}/transactions/${transactionId}/evidence`, {
         method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
       });
 

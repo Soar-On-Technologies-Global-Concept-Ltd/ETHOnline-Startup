@@ -16,7 +16,7 @@ import { useIntentStore } from "@/store/intentStore";
 import { usePrivy, useSendTransaction } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { fetchIntentById, Intent } from "@/lib/api";
+import { fetchIntentById, Intent, API_BASE_URL } from "@/lib/api";
 
 interface DisputeResolutionData {
   rationale?: string;
@@ -50,8 +50,8 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
   useEffect(() => {
     async function loadIntent() {
       try {
-        await getAccessToken();
-        const data = await fetchIntentById(intentId); // We assume fetchIntentById handles this or doesn't need auth, but wait, the API lib might need auth. If the user gets 401s here, we need to update the lib. Let's just wrap the internal fetch calls for now.
+        const token = await getAccessToken();
+        const data = await fetchIntentById(intentId, token ?? undefined);
         setIntent(data);
       } catch (e) {
         console.error(e);
@@ -72,9 +72,13 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
     }
   }, [intentId, role, step, evidenceHash, disputeResolution]);
 
+
+  // The URL carries the intent id, but the backend addresses transactions by their own id.
+  // fetchIntentById returns it; until the intent loads, fall back to the param.
+  const txId = intent?.transactionId ?? intentId;
+
   const handleSignMandateAndLock = async () => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
       const token = await getAccessToken();
       const headers = { 
         "Content-Type": "application/json",
@@ -97,7 +101,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
         };
       } else {
         // 1. Get createIntent calls from backend
-        const response = await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
+        const response = await fetch(`${API_BASE_URL}/transactions/${txId}/fund`, {
           method: "POST",
           headers,
           body: JSON.stringify({}),
@@ -118,7 +122,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
             value: createCall.value ? BigInt(createCall.value) : undefined
           });
           toast.info("Reporting intent creation to backend...");
-          await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
+          await fetch(`${API_BASE_URL}/transactions/${txId}/fund`, {
             method: "POST",
             headers,
             body: JSON.stringify({ tx_hash: txHash.hash || txHash }),
@@ -128,7 +132,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
           let intentBound = false;
           for (let i = 0; i < 30; i++) {
             await new Promise(r => setTimeout(r, 2000));
-            const txRes = await fetch(`${baseUrl}/transactions/${intentId}`, { headers });
+            const txRes = await fetch(`${API_BASE_URL}/transactions/${txId}`, { headers });
             if (txRes.ok) {
               const txData = await txRes.json();
               if (txData.escrow_intent_id != null) {
@@ -140,7 +144,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
           if (!intentBound) throw new Error("Timed out waiting for Arc intent to initialize");
 
           // Fetch fund calls now that intent is bound
-          const response = await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
+          const response = await fetch(`${API_BASE_URL}/transactions/${txId}/fund`, {
             method: "POST",
             headers,
             body: JSON.stringify({}),
@@ -179,7 +183,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
             value: fundCall.value ? BigInt(fundCall.value) : undefined
           });
 
-          await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
+          await fetch(`${API_BASE_URL}/transactions/${txId}/fund`, {
             method: "POST",
             headers,
             body: JSON.stringify({ tx_hash: finalTxHash.hash || finalTxHash }),
@@ -211,7 +215,6 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
 
   const handleDisputeSubmitted = async (complaint: string) => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
       const token = await getAccessToken();
       const headers = { 
         "Content-Type": "application/json",
@@ -219,7 +222,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
       };
       
       if (!intentId.startsWith("intent_")) {
-        const response = await fetch(`${baseUrl}/transactions/${intentId}/complaint`, {
+        const response = await fetch(`${API_BASE_URL}/transactions/${txId}/complaint`, {
           method: "POST",
           headers,
           body: JSON.stringify({
@@ -243,7 +246,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
         if (intentId.startsWith("intent_")) {
            isResolved = true; // immediately resolve for mock
         } else {
-          const res = await fetch(`${baseUrl}/transactions/${intentId}`, { headers });
+          const res = await fetch(`${API_BASE_URL}/transactions/${txId}`, { headers });
           if (res.ok) {
             txData = await res.json();
             if (txData.state === "resolved" || txData.state === "disputed") {
@@ -275,7 +278,6 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
 
   const handleSignResolution = async () => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
       const token = await getAccessToken();
       const headers = { 
         "Content-Type": "application/json",
@@ -290,7 +292,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
       };
 
       if (!intentId.startsWith("intent_")) {
-        const req = await fetch(`${baseUrl}/transactions/${intentId}/release`, {
+        const req = await fetch(`${API_BASE_URL}/transactions/${txId}/release`, {
           method: "POST",
           headers,
           body: JSON.stringify({}),
@@ -311,7 +313,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
         });
         
         if (!intentId.startsWith("intent_")) {
-          const response = await fetch(`${baseUrl}/transactions/${intentId}/release`, {
+          const response = await fetch(`${API_BASE_URL}/transactions/${txId}/release`, {
             method: "POST",
             headers,
             body: JSON.stringify({ signature: sig }),
@@ -489,7 +491,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
           )}
 
           {role === 'provider' && step === 'paid' && (
-            <EvidenceUploader intentId={intentId} onEvidenceSubmitted={handleEvidenceSubmitted} />
+            <EvidenceUploader transactionId={txId} onEvidenceSubmitted={handleEvidenceSubmitted} />
           )}
 
           {/* Step 3: Reusable DisputeResolver */}

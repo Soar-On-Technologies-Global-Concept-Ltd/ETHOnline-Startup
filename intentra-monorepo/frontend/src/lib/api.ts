@@ -1,5 +1,9 @@
 export interface Intent {
   id: string;
+  /** The backend addresses every later step by transaction id, not intent id. */
+  transactionId?: string;
+  /** True when this object is local demo data because the API could not be read. */
+  isFallback?: boolean;
   service: string;
   city: string;
   maxUsd: number;
@@ -29,7 +33,7 @@ export interface ProviderProfile {
 
 const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ethonline-startup-intentra.onrender.com";
 const cleanBaseUrl = rawApiUrl.replace(/\/+$/, "");
-const API_BASE_URL = cleanBaseUrl.endsWith("/v1") ? cleanBaseUrl : `${cleanBaseUrl}/v1`;
+export const API_BASE_URL = cleanBaseUrl.endsWith("/v1") ? cleanBaseUrl : `${cleanBaseUrl}/v1`;
 
 export async function parseAndCreateIntent(rawPrompt: string, token: string): Promise<Intent> {
   try {
@@ -87,19 +91,36 @@ function getMockProviders(isPainter = false): ProviderQuote[] {
   ];
 }
 
-export async function fetchIntentById(id: string): Promise<Intent> {
+export async function fetchIntentById(id: string, token?: string): Promise<Intent> {
   try {
-    const res = await fetch(`${API_BASE_URL}/intents/${id}`);
+    const res = await fetch(`${API_BASE_URL}/intents/${id}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
     if (res.ok) {
       const data = await res.json();
-      return data;
+      // Map the API shape onto Intent. Returning `data` raw looked fine and rendered blank,
+      // because the backend speaks intent_id/spec and this interface speaks id/service.
+      return {
+        id: data.intent_id ?? id,
+        transactionId: data.transaction_id,
+        service: data.spec?.service ?? "Event Photography",
+        city: data.spec?.area ?? "San Francisco, CA",
+        maxUsd: data.spec?.budget_max_minor ? Math.round(data.spec.budget_max_minor / 160000) : 150,
+        window: data.spec?.date ?? "This Saturday",
+        status: "MATCHED",
+        providers: getMockProviders(),
+      };
     }
+    // A 401 is not an exception, so without this line the failure is silent and the screen
+    // quietly shows demo data as though it were real.
+    console.warn(`GET /intents/${id} returned ${res.status}; showing demo data instead`);
   } catch (err) {
-    console.warn(`Could not fetch intent ${id} from API, returning scoped object`, err);
+    console.warn(`Could not reach the API for intent ${id}; showing demo data instead`, err);
   }
 
   return {
     id,
+    isFallback: true,
     service: "Verified Event Photography",
     city: "San Francisco, CA",
     maxUsd: 150,
