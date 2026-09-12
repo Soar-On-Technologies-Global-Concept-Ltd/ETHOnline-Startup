@@ -3,9 +3,13 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import { PrivyLoginButton } from "@/components/auth/PrivyLoginButton";
-import { FiSearch, FiBell } from "react-icons/fi";
+import { FiSearch, FiBell, FiMenu } from "react-icons/fi";
 
-export function Topbar() {
+interface TopbarProps {
+  onMenuClick?: () => void;
+}
+
+export function Topbar({ onMenuClick }: TopbarProps) {
   const pathname = usePathname();
 
   // Simple Breadcrumbs logic
@@ -23,16 +27,24 @@ export function Topbar() {
   };
 
   return (
-    <header className="h-16 border-b border-white/5 bg-background/80 backdrop-blur-md sticky top-0 z-40 flex items-center justify-between px-6">
-      {/* Breadcrumbs */}
-      <div className="flex items-center gap-2 text-sm font-mono text-text-muted">
-        <span>Intentra</span>
-        <span>/</span>
-        <span className="text-foreground font-medium">{getBreadcrumbTitle()}</span>
+    <header className="h-16 border-b border-white/5 bg-background/80 backdrop-blur-md sticky top-0 z-30 flex items-center justify-between px-4 md:px-6">
+      {/* Mobile Menu & Breadcrumbs */}
+      <div className="flex items-center gap-3">
+        <button 
+          className="md:hidden p-2 text-text-muted hover:text-foreground hover:bg-white/5 rounded-md -ml-2"
+          onClick={onMenuClick}
+        >
+          <FiMenu className="w-5 h-5" />
+        </button>
+        <div className="flex items-center gap-2 text-sm font-mono text-text-muted">
+          <span className="hidden sm:inline">Intentra</span>
+          <span className="hidden sm:inline">/</span>
+          <span className="text-foreground font-medium">{getBreadcrumbTitle()}</span>
+        </div>
       </div>
 
       {/* Right Actions */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 md:gap-4">
         <div className="hidden md:flex items-center gap-3">
           <button className="p-2 text-text-muted hover:text-foreground hover:bg-white/5 rounded-md transition-colors">
             <FiSearch className="w-4 h-4" />
