@@ -88,7 +88,7 @@ export function VerifyHumanityWidget({
 
   if (isVerified) {
     return (
-      <div className="flex items-center justify-center gap-2 p-2.5 bg-success/10 border border-success/30 rounded-md text-success font-medium text-xs">
+      <div className="flex items-center justify-center gap-2 p-2.5 bg-transparent border border-success/50 rounded-md text-success font-medium text-xs">
         <span>✓ Verified Human (World ID)</span>
       </div>
     );
