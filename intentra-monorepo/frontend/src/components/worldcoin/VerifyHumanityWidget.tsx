@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { IDKitRequestWidget, deviceLegacy, type RpContext } from "@worldcoin/idkit";
+import { IDKitRequestWidget, deviceLegacy, type RpContext, type IDKitResult } from "@worldcoin/idkit";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { toast } from "sonner";
 import { useIntentStore } from "@/store/intentStore";
@@ -51,7 +51,7 @@ export function VerifyHumanityWidget({
     fetchSig();
   }, [action]);
 
-  const handleVerify = async (result: any) => {
+  const handleVerify = async (result: IDKitResult) => {
     const response = await fetch("/api/verify-proof", {
       method: "POST",
       headers: { "content-type": "application/json" },

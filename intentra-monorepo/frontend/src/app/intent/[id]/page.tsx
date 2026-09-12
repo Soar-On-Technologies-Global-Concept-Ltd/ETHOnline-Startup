@@ -8,7 +8,7 @@ import { TransactionTimeline, TimelineStep } from "@/components/ui/TransactionTi
 import { EvidenceUploader } from "@/components/ui/EvidenceUploader";
 import { DisputeResolver } from "@/components/ui/DisputeResolver";
 import { VerifyHumanityWidget } from "@/components/worldcoin/VerifyHumanityWidget";
-import { FiArrowLeft as ArrowLeft, FiLock as Lock } from "react-icons/fi";
+import { FiArrowLeft as ArrowLeft } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
@@ -18,6 +18,14 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { fetchIntentById, Intent } from "@/lib/api";
 
+interface DisputeResolutionData {
+  rationale?: string;
+  customerUsd?: number | string;
+  splitCustomer?: number | string;
+  providerUsd?: number | string;
+  splitProvider?: number | string;
+}
+
 export default function IntentTransactionPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const intentId = resolvedParams.id;
@@ -26,7 +34,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
   const [intent, setIntent] = useState<Intent | null>(null);
   const [step, setStep] = useState<TimelineStep>('pending');
   const [evidenceHash, setEvidenceHash] = useState<string | null>(null);
-  const [disputeResolution, setDisputeResolution] = useState<any>(null);
+  const [disputeResolution, setDisputeResolution] = useState<DisputeResolutionData | null>(null);
 
   const isVerified = useIntentStore(state => state.isVerified);
   const { ready, authenticated, signTypedData } = usePrivy();
@@ -78,8 +86,9 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
 
       setStep('paid');
       toast.success(`Mandate Signed & $${intent?.maxUsd || 150} USDC Locked in Arc Escrow!`);
-    } catch (err: any) {
-      if (err?.message?.includes("User rejected") || err?.code === 4001) {
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string; code?: number };
+      if (errorObj?.message?.includes("User rejected") || errorObj?.code === 4001) {
         toast.error("Signature cancelled by user");
         return;
       }
@@ -250,10 +259,10 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
               <SolidCard variant="glass" className="p-6 text-center border-l-2 border-l-success rounded-lg">
                 <h3 className="font-display font-bold text-lg mb-1">${intent.maxUsd} USDC Secured in Arc Escrow</h3>
                 <p className="text-text-muted text-xs font-mono max-w-md mx-auto mb-4">
-                  Provider "{primaryProvider.name}" is now executing the service. Waiting for photo evidence upload.
+                  Provider &quot;{primaryProvider.name}&quot; is now executing the service. Waiting for photo evidence upload.
                 </p>
                 <div className="inline-flex items-center gap-2 text-xs font-mono text-text-muted bg-white/5 px-3.5 py-1.5 rounded-md border border-white/10">
-                  <span>Switch to "Provider View" in top toggle to simulate evidence submission.</span>
+                  <span>Switch to &quot;Provider View&quot; in top toggle to simulate evidence submission.</span>
                 </div>
               </SolidCard>
             )}
@@ -273,7 +282,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
                 <h3 className="font-display font-bold text-lg mb-3">AI L2 Arbitrator Proposed Resolution</h3>
 
                 <p className="text-xs font-mono text-text-muted mb-5 bg-white/5 p-3.5 rounded-md border border-white/10 leading-relaxed">
-                  "{disputeResolution.rationale}"
+                  &quot;{String(disputeResolution.rationale || '')}&quot;
                 </p>
 
                 <div className="grid grid-cols-2 gap-4 mb-6 text-center font-mono">

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { FiAlertTriangle as AlertTriangle } from "react-icons/fi";
+import { useRouter } from "next/navigation";
 
 export default function Error({
   error,
@@ -11,6 +12,8 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const router = useRouter();
+
   useEffect(() => {
     // Log the error to an error reporting service
     console.error(error);
@@ -26,11 +29,11 @@ export default function Error({
       <div className="flex gap-4">
         <button 
           onClick={() => reset()}
-          className="px-6 py-2 border border-border text-foreground rounded-md hover:bg-surface-hover transition-colors font-medium"
+          className="px-6 py-2 border border-border text-foreground rounded-md hover:bg-surface-hover transition-colors font-medium cursor-pointer"
         >
           Try Again
         </button>
-        <PrimaryButton onClick={() => window.location.href = '/'}>
+        <PrimaryButton onClick={() => router.push('/')}>
           Return Home
         </PrimaryButton>
       </div>

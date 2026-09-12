@@ -3,36 +3,44 @@
 import { useState, useRef, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
-import { 
-  FiLogOut, 
-  FiCreditCard as Wallet, 
-  FiChevronDown, 
-  FiCopy, 
-  FiCheck, 
+import {
+  FiLogOut,
+  FiCreditCard as Wallet,
+  FiChevronDown,
+  FiCopy,
+  FiCheck,
   FiUser,
-  FiExternalLink
+  FiExternalLink,
 } from "react-icons/fi";
 import { toast } from "sonner";
 import Link from "next/link";
 
 interface PrivyLoginButtonProps {
   className?: string;
-  variant?: 'primary' | 'secondary' | 'danger' | 'glass';
+  variant?: "primary" | "secondary" | "danger" | "glass";
 }
 
-export function PrivyLoginButton({ className, variant = 'glass' }: PrivyLoginButtonProps) {
+export function PrivyLoginButton({
+  className,
+  variant = "glass",
+}: PrivyLoginButtonProps) {
   const { login, logout, ready, authenticated, user } = usePrivy();
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const address = user?.wallet?.address;
-  const truncatedAddress = address ? `${address.substring(0, 6)}...${address.substring(address.length - 4)}` : null;
+  const truncatedAddress = address
+    ? `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
+    : null;
 
   // Close dropdown on click outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     }
@@ -51,6 +59,7 @@ export function PrivyLoginButton({ className, variant = 'glass' }: PrivyLoginBut
       toast.success("Wallet address copied to clipboard!");
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
+      console.error("Copy failed", err);
       toast.error("Failed to copy address");
     }
   };
@@ -74,7 +83,9 @@ export function PrivyLoginButton({ className, variant = 'glass' }: PrivyLoginBut
         >
           <Wallet className="w-3.5 h-3.5 text-success" />
           <span>{truncatedAddress || user?.email?.address || "Connected"}</span>
-          <FiChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+          <FiChevronDown
+            className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+          />
         </button>
 
         {/* Dropdown Menu */}
@@ -104,9 +115,15 @@ export function PrivyLoginButton({ className, variant = 'glass' }: PrivyLoginBut
                   ) : (
                     <FiCopy className="w-3.5 h-3.5 text-primary" />
                   )}
-                  <span>{copied ? "Address Copied!" : "Copy Wallet Address"}</span>
+                  <span>
+                    {copied ? "Address Copied!" : "Copy Wallet Address"}
+                  </span>
                 </div>
-                {copied && <span className="text-[10px] text-success font-semibold">Copied</span>}
+                {copied && (
+                  <span className="text-[10px] text-success font-semibold">
+                    Copied
+                  </span>
+                )}
               </button>
 
               {/* View Profile */}
@@ -122,7 +139,7 @@ export function PrivyLoginButton({ className, variant = 'glass' }: PrivyLoginBut
               {/* Block Explorer */}
               {address && (
                 <a
-                  href={`https://explorer.arc.network/address/${address}`}
+                  href={`https://testnet.arcscan.app/address/${address}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setIsOpen(false)}
@@ -162,4 +179,3 @@ export function PrivyLoginButton({ className, variant = 'glass' }: PrivyLoginBut
     </PrimaryButton>
   );
 }
-

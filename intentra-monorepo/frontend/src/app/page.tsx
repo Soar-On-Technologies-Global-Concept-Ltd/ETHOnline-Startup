@@ -2,7 +2,7 @@
 
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import React from 'react';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SolidCard } from '@/components/ui/SolidCard';
 import { FiArrowRight as ArrowRight } from "react-icons/fi";

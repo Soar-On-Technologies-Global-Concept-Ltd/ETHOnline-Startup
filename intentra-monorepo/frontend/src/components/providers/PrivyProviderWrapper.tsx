@@ -1,17 +1,19 @@
 "use client";
 
 import { PrivyProvider } from "@privy-io/react-auth";
-import React, { useEffect, useState } from "react";
+import React, { useSyncExternalStore } from "react";
+
+const emptySubscribe = () => () => {};
 
 export function PrivyProviderWrapper({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false);
+  const isMounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!appId || !mounted) {
+  if (!appId || !isMounted) {
     return <>{children}</>;
   }
 
