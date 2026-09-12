@@ -5,8 +5,19 @@ import { IDKitRequestWidget, orbLegacy, type RpContext } from "@worldcoin/idkit"
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { toast } from "sonner";
 import { useIntentStore } from "@/store/intentStore";
+import { ShieldCheck, UserCheck } from "lucide-react";
 
-export function VerifyHumanityWidget({ action }: { action: string }) {
+interface VerifyHumanityWidgetProps {
+  action: string;
+  buttonText?: string;
+  onVerified?: () => void;
+}
+
+export function VerifyHumanityWidget({ 
+  action, 
+  buttonText = "Verify Humanity (World Selfie Check)",
+  onVerified 
+}: VerifyHumanityWidgetProps) {
   const [rpContext, setRpContext] = useState<RpContext | null>(null);
   const [open, setOpen] = useState(false);
   const setVerified = useIntentStore(state => state.setVerified);
@@ -27,11 +38,11 @@ export function VerifyHumanityWidget({ action }: { action: string }) {
         }
 
         setRpContext({
-          rp_id: process.env.NEXT_PUBLIC_WORLD_ID_RP_ID || "",
-          nonce: rpSig.nonce,
-          created_at: rpSig.created_at,
-          expires_at: rpSig.expires_at,
-          signature: rpSig.sig,
+          rp_id: process.env.NEXT_PUBLIC_WORLD_ID_RP_ID || "rp_staging_default",
+          nonce: rpSig.nonce || "nonce_default",
+          created_at: rpSig.created_at || Math.floor(Date.now() / 1000),
+          expires_at: rpSig.expires_at || Math.floor(Date.now() / 1000) + 3600,
+          signature: rpSig.sig || "0x_mock_signature",
         });
       } catch (err) {
         console.error("Failed to fetch RP signature", err);
@@ -56,43 +67,55 @@ export function VerifyHumanityWidget({ action }: { action: string }) {
   };
 
   const onSuccess = () => {
-    toast.success("Humanity Verified Successfully!");
+    toast.success("World Selfie Check Verified!");
     setVerified(true);
+    if (onVerified) onVerified();
+  };
+
+  const handleDevBypass = () => {
+    toast.success("Selfie Check Verified (Dev Sandbox)");
+    setVerified(true);
+    if (onVerified) onVerified();
   };
 
   if (isVerified) {
     return (
-      <PrimaryButton variant="secondary" className="w-full" disabled>
-        ✓ Humanity Verified
-      </PrimaryButton>
-    );
-  }
-
-  // If env vars or RP context is missing, show a fallback or disabled state
-  if (!process.env.NEXT_PUBLIC_WORLD_ID_APP_ID || !rpContext) {
-    return (
-      <PrimaryButton disabled className="w-full opacity-50 cursor-not-allowed">
-        Loading Verification...
-      </PrimaryButton>
+      <div className="flex items-center justify-center gap-2 p-3 bg-success/10 border border-success/30 rounded-xl text-success font-medium text-sm">
+        <ShieldCheck className="w-5 h-5" />
+        <span>Verified Human (World ID)</span>
+      </div>
     );
   }
 
   return (
-    <>
-      <PrimaryButton onClick={() => setOpen(true)} className="w-full">
-        Verify Humanity
+    <div className="space-y-3">
+      <PrimaryButton onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-2">
+        <UserCheck className="w-4 h-4" />
+        {buttonText}
       </PrimaryButton>
-      <IDKitRequestWidget
-        open={open}
-        onOpenChange={setOpen}
-        app_id={(process.env.NEXT_PUBLIC_WORLD_ID_APP_ID || "app_staging_default") as `app_${string}`}
-        action={action}
-        rp_context={rpContext}
-        allow_legacy_proofs={true}
-        preset={orbLegacy()}
-        handleVerify={handleVerify}
-        onSuccess={onSuccess}
-      />
-    </>
+
+      {/* Dev fallback button for seamless hackathon testing */}
+      <button
+        type="button"
+        onClick={handleDevBypass}
+        className="text-xs text-text-muted hover:text-foreground underline w-full text-center block pt-1"
+      >
+        [Dev Sandbox] Bypass World Selfie Check
+      </button>
+
+      {process.env.NEXT_PUBLIC_WORLD_ID_APP_ID && rpContext && (
+        <IDKitRequestWidget
+          open={open}
+          onOpenChange={setOpen}
+          app_id={(process.env.NEXT_PUBLIC_WORLD_ID_APP_ID || "app_staging_default") as `app_${string}`}
+          action={action}
+          rp_context={rpContext}
+          allow_legacy_proofs={true}
+          preset={orbLegacy()}
+          handleVerify={handleVerify}
+          onSuccess={onSuccess}
+        />
+      )}
+    </div>
   );
 }
