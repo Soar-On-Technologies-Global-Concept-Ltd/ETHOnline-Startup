@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { IDKitRequestWidget, VerificationLevel, type RpContext } from "@worldcoin/idkit";
+import { IDKitRequestWidget, type RpContext } from "@worldcoin/idkit";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { toast } from "sonner";
 import { useIntentStore } from "@/store/intentStore";
@@ -107,7 +107,7 @@ export function VerifyHumanityWidget({
           app_id={(process.env.NEXT_PUBLIC_WORLD_ID_APP_ID) as `app_${string}`}
           action={action}
           rp_context={rpContext}
-          verification_level={VerificationLevel.Device}
+          verificationLevel="device"
           handleVerify={handleVerify}
           onSuccess={onSuccess}
         />
