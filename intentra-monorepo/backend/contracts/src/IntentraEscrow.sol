@@ -107,6 +107,8 @@ contract IntentraEscrow {
         Job storage job = jobs[txKey];
         if (job.status != Status.Funded) revert WrongStatus();
         if (msg.sender != job.provider) revert NotParty();
+        // casting to 'uint64' is safe: block.timestamp does not exceed uint64 until the year 2106
+        // forge-lint: disable-next-line(unsafe-typecast)
         job.releaseAfter = uint64(block.timestamp) + job.disputeWindow;
         job.status = Status.Submitted;
         emit Submitted(txKey, deliverableHash, job.releaseAfter);
@@ -138,7 +140,7 @@ contract IntentraEscrow {
     /// @notice Settles a dispute. The resolver only relays: the contract checks both parties' EIP-712 signatures,
     ///         so a leaked resolver key still cannot settle alone.
     function resolve(bytes32 txKey, uint16 providerBps, bytes32 outcomeHash, bytes calldata sigCustomer,
-                     bytes calldata sigProvider) external onlyResolver nonReentrant {
+                     bytes calldata sigProvider) external nonReentrant onlyResolver {
         Job storage job = jobs[txKey];
         if (job.status != Status.Disputed) revert WrongStatus();
         if (providerBps > BPS) revert BadInput();

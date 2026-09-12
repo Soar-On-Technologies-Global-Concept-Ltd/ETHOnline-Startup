@@ -123,14 +123,28 @@ folder and replacing its service calls with HTTP — which is the point.
 
 ```bash
 pytest                    # pure: transitions, policy, money, hashing, EIP-712, World vectors, AI validation, trust, evidence
-pytest -m db              # both demo paths end to end against Postgres, with synthetic escrow events
+pytest -m db              # both demo paths end to end, plus the abuse cases in tests/test_security_db.py
 lint-imports              # 14 architecture contracts: layering, kernel purity, thin routers, private tables
-cd contracts && forge install foundry-rs/forge-std && forge test   # conservation, access control,
-                          # settle-once, both signatures, refund
+cd contracts && forge install foundry-rs/forge-std && forge test   # 24 tests: conservation, access control,
+                          # settle-once, cross-job signature replay, a stolen resolver key, refunds
 ```
 
 `shared/eip712.vectors.json` is signed by the same fixed key in the API and web test suites, so both check the same bytes.
 `alembic check` is part of the loop too: the tables live in each domain now, and it proves the SQL did not move with them.
+
+## Security
+
+The abuse cases are tests, not prose — `tests/test_security_db.py` drives them over HTTP and
+`contracts/test/IntentraEscrowSecurity.t.sol` drives them against the escrow:
+
+- A non-party gets **404**, not 403: they do not learn that a transaction exists, and never see its `tx_key`.
+- A signature from the wrong wallet, a Selfie Check replayed on the same job, an idempotency key reused with a
+  different body, a forged webhook HMAC and a forged evidence link are each refused.
+- The dev-only chain simulator is unreachable unless `ENV=dev`, even with a correct HMAC.
+- Uploads are sniffed from their bytes, not their `Content-Type`, and are refused before the job starts.
+- On-chain: a stolen resolver key cannot settle alone, cannot forge a party's signature, cannot pay a third party
+  and cannot replay a resolution signed for another job. Every split conserves the amount (fuzzed).
+- Staging and production refuse to start with the sample secrets or with any partner in `fake` mode.
 
 ## Deploying
 
