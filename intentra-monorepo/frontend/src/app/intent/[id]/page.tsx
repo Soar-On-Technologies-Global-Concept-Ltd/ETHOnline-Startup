@@ -18,6 +18,14 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { fetchIntentById, Intent } from "@/lib/api";
 
+interface DisputeResolutionData {
+  rationale?: string;
+  customerUsd?: number | string;
+  splitCustomer?: number | string;
+  providerUsd?: number | string;
+  splitProvider?: number | string;
+}
+
 export default function IntentTransactionPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const intentId = resolvedParams.id;
@@ -26,7 +34,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
   const [intent, setIntent] = useState<Intent | null>(null);
   const [step, setStep] = useState<TimelineStep>('pending');
   const [evidenceHash, setEvidenceHash] = useState<string | null>(null);
-  const [disputeResolution, setDisputeResolution] = useState<any>(null);
+  const [disputeResolution, setDisputeResolution] = useState<DisputeResolutionData | null>(null);
 
   const isVerified = useIntentStore(state => state.isVerified);
   const { ready, authenticated, signTypedData } = usePrivy();
@@ -44,24 +52,6 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
       setIntent(data);
     }
     loadIntent();
-  }, [intentId]);
-
-  // Load state from localStorage on mount
-  useEffect(() => {
-    if (intentId) {
-      const savedState = localStorage.getItem(`intent_demo_state_${intentId}`);
-      if (savedState) {
-        try {
-          const parsed = JSON.parse(savedState);
-          if (parsed.role) setRole(parsed.role);
-          if (parsed.step) setStep(parsed.step);
-          if (parsed.evidenceHash) setEvidenceHash(parsed.evidenceHash);
-          if (parsed.disputeResolution) setDisputeResolution(parsed.disputeResolution);
-        } catch (e) {
-          console.error("Failed to parse saved state", e);
-        }
-      }
-    }
   }, [intentId]);
 
   // Save state to localStorage on change
@@ -108,8 +98,9 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
 
       setStep('paid');
       toast.success(`Mandate Signed & $${intent?.maxUsd || 150} USDC Locked in Arc Escrow!`);
-    } catch (err: any) {
-      if (err?.message?.includes("User rejected") || err?.code === 4001) {
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string; code?: number };
+      if (errorObj?.message?.includes("User rejected") || errorObj?.code === 4001) {
         toast.error("Signature cancelled by user");
         return;
       }
@@ -166,8 +157,9 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
 
       setStep('resolved');
       toast.success("Resolution signed! Arc Smart Contract executed split refund.");
-    } catch (err: any) {
-      if (err?.message?.includes("User rejected") || err?.code === 4001) {
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string; code?: number };
+      if (errorObj?.message?.includes("User rejected") || errorObj?.code === 4001) {
         toast.error("Signature cancelled by user");
         return;
       }
@@ -175,11 +167,6 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
       setStep('resolved');
       toast.success("Resolution signed! Arc Smart Contract executed split refund.");
     }
-  };
-
-  const handleAppealDecision = () => {
-    setStep('appealed');
-    toast.info("Escalated to Human Oracle. Funds are frozen.");
   };
 
   if (!ready || !authenticated || !intent) {
@@ -324,16 +311,17 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
 
           {/* Step 2: Escrow Locked Waiting for Evidence */}
           {role === 'customer' && step === 'paid' && (
-            <div className="p-8 text-center border border-success/30 bg-success/5 rounded-2xl">
-              <h3 className="font-display font-medium text-xl mb-2 text-white">${intent.maxUsd} USDC Secured</h3>
-              <p className="text-white/50 text-xs font-mono max-w-sm mx-auto mb-6">
-                Provider "{primaryProvider.name}" is executing the service. Awaiting evidence.
+            <SolidCard variant="glass" className="p-6 text-center border-l-2 border-l-success rounded-lg">
+              <h3 className="font-display font-bold text-lg mb-1">${intent.maxUsd} USDC Secured in Arc Escrow</h3>
+              <p className="text-text-muted text-xs font-mono max-w-md mx-auto mb-4">
+                Provider &quot;{primaryProvider.name}&quot; is now executing the service. Waiting for photo evidence upload.
               </p>
-              <div className="inline-flex items-center gap-2 text-xs font-mono text-white/40 bg-black/40 px-4 py-2 rounded-lg border border-white/5">
-                <span>Switch to "Provider" toggle to submit evidence.</span>
+              <div className="inline-flex items-center gap-2 text-xs font-mono text-text-muted bg-white/5 px-3.5 py-1.5 rounded-md border border-white/10">
+                <span>Switch to &quot;Provider View&quot; in top toggle to simulate evidence submission.</span>
               </div>
-            </div>
+            </SolidCard>
           )}
+
           {role === 'provider' && step === 'paid' && (
             <EvidenceUploader onEvidenceSubmitted={handleEvidenceSubmitted} />
           )}
@@ -346,79 +334,56 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
               onConfirmWork={() => setStep('resolved')}
             />
           )}
+
           {role === 'provider' && step === 'evidence_submitted' && (
-            <div className="p-8 text-center border border-success/30 bg-success/5 rounded-2xl">
-              <h3 className="font-display font-medium text-xl mb-2 text-white">Evidence Anchored on Arc</h3>
-              <p className="text-xs font-mono text-white/50 max-w-sm mx-auto">
-                Awaiting customer confirmation.
+            <SolidCard variant="glass" className="p-6 text-center border-l-2 border-l-primary rounded-lg">
+              <h3 className="font-display font-bold text-lg mb-1">Evidence Anchored on Arc</h3>
+              <p className="text-text-muted text-xs font-mono max-w-md mx-auto mb-4">
+                Photo evidence uploaded. Awaiting customer confirmation or AI L2 dispute evaluation.
               </p>
-              <div className="inline-flex items-center gap-2 text-xs font-mono text-white/40 bg-black/40 px-4 py-2 rounded-lg border border-white/5 mt-6">
-                <span>Switch to "Consumer" toggle to review.</span>
+              <div className="inline-flex items-center gap-2 text-xs font-mono text-text-muted bg-white/5 px-3.5 py-1.5 rounded-md border border-white/10">
+                <span>Switch to &quot;Consumer View&quot; in top toggle to review submission.</span>
               </div>
-            </div>
+            </SolidCard>
           )}
 
-          {/* Step 4: Dispute Open & AI L2 Arbitration (BOTH) */}
+          {/* Step 4: Dispute Open & AI L2 Arbitration */}
           {step === 'disputed' && disputeResolution && (
-            <div className="p-8 border border-warning/30 bg-warning/5 rounded-2xl">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                <h3 className="font-display font-medium text-xl text-white">AI Arbitrator Resolution</h3>
-                <span className="text-[10px] font-mono bg-warning/10 text-warning border border-warning/20 px-3 py-1 rounded-full uppercase tracking-wider">
-                  {role} signature required
-                </span>
-              </div>
+            <SolidCard variant="glass" className="p-6 border-l-2 border-l-warning rounded-lg">
+              <h3 className="font-display font-bold text-lg mb-3">AI L2 Arbitrator Proposed Resolution</h3>
 
-              <p className="text-xs font-mono text-white/60 mb-8 bg-black/40 p-4 rounded-xl border border-white/5 leading-relaxed">
-                "{disputeResolution.rationale}"
+              <p className="text-xs font-mono text-text-muted mb-5 bg-white/5 p-3.5 rounded-md border border-white/10 leading-relaxed">
+                &quot;{String(disputeResolution.rationale || '')}&quot;
               </p>
 
-              <div className="grid grid-cols-2 gap-4 mb-8 text-center font-mono">
-                <div className="p-5 rounded-xl bg-black/40 border border-white/5">
-                  <span className="text-[10px] text-white/40 block mb-1 uppercase tracking-wider">Consumer Refund</span>
-                  <span className="text-2xl font-medium text-success">${disputeResolution.customerUsd}</span>
-                  <span className="text-[10px] text-white/30 block mt-1">({disputeResolution.splitCustomer}%)</span>
+              <div className="grid grid-cols-2 gap-4 mb-6 text-center font-mono">
+                <div className="p-3.5 rounded-md bg-black/40 border border-white/10">
+                  <span className="text-xs text-text-muted block mb-0.5">Customer Refund</span>
+                  <span className="text-xl font-bold text-success">${disputeResolution.customerUsd} USDC</span>
+                  <span className="text-[10px] text-text-muted block mt-0.5">({disputeResolution.splitCustomer}%)</span>
                 </div>
 
-                <div className="p-5 rounded-xl bg-black/40 border border-white/5">
-                  <span className="text-[10px] text-white/40 block mb-1 uppercase tracking-wider">Provider Payout</span>
-                  <span className="text-2xl font-medium text-white">${disputeResolution.providerUsd}</span>
-                  <span className="text-[10px] text-white/30 block mt-1">({disputeResolution.splitProvider}%)</span>
+                <div className="p-3.5 rounded-md bg-black/40 border border-white/10">
+                  <span className="text-xs text-text-muted block mb-0.5">Provider Payout</span>
+                  <span className="text-xl font-bold text-foreground">${disputeResolution.providerUsd} USDC</span>
+                  <span className="text-[10px] text-text-muted block mt-0.5">({disputeResolution.splitProvider}%)</span>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4">
-                <PrimaryButton variant="primary" onClick={handleSignResolution} className="flex-1 py-3 text-xs tracking-wide">
-                  Accept Resolution & Split
-                </PrimaryButton>
-                <button 
-                  onClick={handleAppealDecision} 
-                  className="flex-1 py-3 text-xs tracking-wide font-mono text-white/50 hover:text-white border border-white/10 hover:bg-white/5 rounded-lg transition-colors"
-                >
-                  Appeal Decision
-                </button>
-              </div>
-            </div>
+              <PrimaryButton variant="primary" onClick={handleSignResolution} className="w-full py-2.5 text-xs">
+                Sign Resolution & Execute 70/30 Split on Arc
+              </PrimaryButton>
+            </SolidCard>
           )}
 
-          {/* Step 4.5: Appealed (BOTH) */}
-          {step === 'appealed' && (
-            <div className="p-8 text-center border border-warning/30 bg-warning/5 rounded-2xl">
-              <h3 className="font-display font-medium text-xl mb-2 text-white">Escalated to Human Oracle</h3>
-              <p className="text-xs font-mono text-white/50 max-w-sm mx-auto mb-6">
-                Funds are locked in a 7-day timelock pending review by a decentralized Human Oracle.
-              </p>
-              <div className="w-6 h-6 border-2 border-white/10 border-t-warning rounded-full animate-spin mx-auto" />
-            </div>
-          )}
-
-          {/* Step 5: Resolved (BOTH) */}
+          {/* Step 5: Resolved */}
           {step === 'resolved' && (
-            <div className="p-8 text-center border border-success/30 bg-success/5 rounded-2xl">
-              <h3 className="font-display font-medium text-xl mb-2 text-white">Escrow Settled & Closed</h3>
-              <p className="text-xs font-mono text-white/50 max-w-sm mx-auto">
-                Transaction recorded seamlessly on The Graph.
+            <SolidCard variant="glass" className="p-6 text-center border-l-2 border-l-success rounded-lg">
+              <h3 className="font-display font-bold text-lg mb-1">Escrow Settled & Closed</h3>
+              <p className="text-xs font-mono text-text-muted max-w-md mx-auto">
+                Arc smart contract successfully executed split settlement. Transaction recorded on The Graph.
               </p>
-            </div>
+            </SolidCard>
           )}
         </motion.div>
       </AnimatePresence>

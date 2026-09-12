@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { parseAndCreateIntent, Intent } from "@/lib/api";
 
 export default function ConsumerDashboard() {
-  const { ready, authenticated, user, getAccessToken } = usePrivy();
+  const { ready, authenticated, getAccessToken } = usePrivy();
   const router = useRouter();
 
   const [prompt, setPrompt] = useState("Find a verified photographer for my event, max $150.");
@@ -41,8 +41,24 @@ export default function ConsumerDashboard() {
   };
 
   useEffect(() => {
-    handleAnalyzeIntent(prompt);
-  }, []);
+    let ignore = false;
+    async function initAnalysis() {
+      setIsAnalyzing(true);
+      try {
+        const token = await getAccessToken();
+        const result = await parseAndCreateIntent(prompt, token || "");
+        if (!ignore) setIntent(result);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (!ignore) setIsAnalyzing(false);
+      }
+    }
+    initAnalysis();
+    return () => {
+      ignore = true;
+    };
+  }, [prompt, getAccessToken]);
 
   if (!ready || !authenticated) {
     return (
