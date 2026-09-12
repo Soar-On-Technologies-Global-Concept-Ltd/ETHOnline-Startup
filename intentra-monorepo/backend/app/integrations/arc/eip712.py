@@ -1,4 +1,12 @@
-"""EIP-712 Authorization and Resolution typed data (shared/eip712.json). The API builds typed data; clients only sign."""
+"""The two typed-data structures the parties sign.
+
+`ResolveIntent` is the contract's own type: `executeWithSignatures` recovers two distinct signers from
+{customer, provider, aiArbitrator} against it, so the domain and field order here must match IntentraEscrow.sol
+exactly — the contract builds its domain with `EIP712("IntentraEscrow", "1")`.
+
+`Authorization` is Intentra's own mandate. The escrow never sees it: it is the record that a human approved this
+job, this provider and this maximum, and it is what the policy engine and the audit trail check against.
+"""
 from eth_account import Account
 from eth_account.messages import encode_typed_data
 
@@ -10,31 +18,45 @@ DOMAIN_TYPE = [{"name": "name", "type": "string"}, {"name": "version", "type": "
 AUTHORIZATION_TYPE = [{"name": "txKey", "type": "bytes32"}, {"name": "customer", "type": "address"},
                       {"name": "provider", "type": "address"}, {"name": "maxAmount", "type": "uint256"},
                       {"name": "scopeHash", "type": "bytes32"}, {"name": "expiresAt", "type": "uint64"}]
-RESOLUTION_TYPE = [{"name": "txKey", "type": "bytes32"}, {"name": "providerBps", "type": "uint16"},
-                   {"name": "outcomeHash", "type": "bytes32"}]
+RESOLVE_INTENT_TYPE = [{"name": "intentId", "type": "uint256"}, {"name": "customerAmount", "type": "uint256"},
+                       {"name": "providerAmount", "type": "uint256"}]
+BIG_FIELDS = ("maxAmount", "intentId", "customerAmount", "providerAmount")
 
 
-def domain() -> dict:
+def contract_domain() -> dict:
+    """Must match EIP712("IntentraEscrow", "1") in the deployed contract."""
     s = get_settings()
-    return {"name": "Intentra", "version": "1", "chainId": s.arc_chain_id, "verifyingContract": checksum(s.escrow_address)}
+    return {"name": "IntentraEscrow", "version": "1", "chainId": s.arc_chain_id,
+            "verifyingContract": checksum(s.escrow_address)}
 
 
-def authorization_typed_data(tx_key: str, customer: str, provider: str, max_amount: int, scope_hash: str, expires_at: int) -> dict:
+def mandate_domain() -> dict:
+    """Intentra's own domain for the off-chain authorization: never presented to the contract."""
+    s = get_settings()
+    return {"name": "Intentra", "version": "1", "chainId": s.arc_chain_id,
+            "verifyingContract": checksum(s.escrow_address)}
+
+
+def authorization_typed_data(tx_key: str, customer: str, provider: str, max_amount: int, scope_hash: str,
+                             expires_at: int) -> dict:
     return {"types": {"EIP712Domain": DOMAIN_TYPE, "Authorization": AUTHORIZATION_TYPE}, "primaryType": "Authorization",
-            "domain": domain(),
-            "message": {"txKey": tx_key, "customer": checksum(customer), "provider": checksum(provider), "maxAmount": int(max_amount),
-                        "scopeHash": scope_hash, "expiresAt": int(expires_at)}}
+            "domain": mandate_domain(),
+            "message": {"txKey": tx_key, "customer": checksum(customer), "provider": checksum(provider),
+                        "maxAmount": int(max_amount), "scopeHash": scope_hash, "expiresAt": int(expires_at)}}
 
 
-def resolution_typed_data(tx_key: str, provider_bps: int, outcome_hash: str) -> dict:
-    return {"types": {"EIP712Domain": DOMAIN_TYPE, "Resolution": RESOLUTION_TYPE}, "primaryType": "Resolution", "domain": domain(),
-            "message": {"txKey": tx_key, "providerBps": int(provider_bps), "outcomeHash": outcome_hash}}
+def resolution_typed_data(intent_id: int, customer_amount: int, provider_amount: int) -> dict:
+    """What both signers sign for executeWithSignatures. The amounts are exact micro-USDC and must sum to the escrow."""
+    return {"types": {"EIP712Domain": DOMAIN_TYPE, "ResolveIntent": RESOLVE_INTENT_TYPE}, "primaryType": "ResolveIntent",
+            "domain": contract_domain(),
+            "message": {"intentId": int(intent_id), "customerAmount": int(customer_amount),
+                        "providerAmount": int(provider_amount)}}
 
 
 def for_client(typed_data: dict) -> dict:
     """Large integers as strings so JavaScript never loses precision."""
-    msg = {k: (str(v) if isinstance(v, int) and k in ("maxAmount",) else v) for k, v in typed_data["message"].items()}
-    return {**typed_data, "message": msg}
+    message = {k: (str(v) if isinstance(v, int) and k in BIG_FIELDS else v) for k, v in typed_data["message"].items()}
+    return {**typed_data, "message": message}
 
 
 def recover(typed_data: dict, signature: str) -> str:

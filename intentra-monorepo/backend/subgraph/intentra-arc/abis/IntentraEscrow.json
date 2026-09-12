@@ -1,292 +1,978 @@
 [
   {
-    "type": "function",
-    "name": "fund",
-    "stateMutability": "nonpayable",
+    "type": "constructor",
     "inputs": [
       {
-        "name": "txKey",
-        "type": "bytes32"
+        "name": "_aiArbitrator",
+        "type": "address",
+        "internalType": "address"
       },
       {
+        "name": "_owner",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_appealFee",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "ABANDONMENT_TIMEOUT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "APPEAL_TIMELOCK",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "RESOLVE_INTENT_TYPEHASH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "acceptOwnership",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "aiArbitrator",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "appealFee",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "appealStakes",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "appellants",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "createIntent",
+    "inputs": [
+      {
         "name": "provider",
-        "type": "address"
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
       },
       {
         "name": "amount",
-        "type": "uint256"
-      },
-      {
-        "name": "authorizationHash",
-        "type": "bytes32"
-      },
-      {
-        "name": "disputeWindow",
-        "type": "uint64"
-      },
-      {
-        "name": "expiresAt",
-        "type": "uint64"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "intentId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "anchorEvidence",
-    "stateMutability": "nonpayable",
-    "inputs": [
+    "name": "domainSeparator",
+    "inputs": [],
+    "outputs": [
       {
-        "name": "txKey",
-        "type": "bytes32"
-      },
-      {
-        "name": "evidenceHash",
-        "type": "bytes32"
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    "outputs": []
+    "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "submit",
-    "stateMutability": "nonpayable",
-    "inputs": [
+    "name": "eip712Domain",
+    "inputs": [],
+    "outputs": [
       {
-        "name": "txKey",
-        "type": "bytes32"
+        "name": "fields",
+        "type": "bytes1",
+        "internalType": "bytes1"
       },
       {
-        "name": "deliverableHash",
-        "type": "bytes32"
+        "name": "name",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "version",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "verifyingContract",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "salt",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "extensions",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
       }
     ],
-    "outputs": []
+    "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "release",
-    "stateMutability": "nonpayable",
+    "name": "escalateAppeal",
     "inputs": [
       {
-        "name": "txKey",
-        "type": "bytes32"
+        "name": "intentId",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "outputs": []
+    "outputs": [],
+    "stateMutability": "payable"
   },
   {
     "type": "function",
-    "name": "openDispute",
-    "stateMutability": "nonpayable",
+    "name": "executeAbandonment",
     "inputs": [
       {
-        "name": "txKey",
-        "type": "bytes32"
-      },
-      {
-        "name": "complaintHash",
-        "type": "bytes32"
+        "name": "intentId",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "outputs": []
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "resolve",
-    "stateMutability": "nonpayable",
+    "name": "executeWithSignatures",
     "inputs": [
       {
-        "name": "txKey",
-        "type": "bytes32"
+        "name": "intentId",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        "name": "providerBps",
-        "type": "uint16"
+        "name": "customerAmount",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        "name": "outcomeHash",
-        "type": "bytes32"
+        "name": "providerAmount",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        "name": "sigCustomer",
-        "type": "bytes"
+        "name": "sigA",
+        "type": "bytes",
+        "internalType": "bytes"
       },
       {
-        "name": "sigProvider",
-        "type": "bytes"
+        "name": "sigB",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
-    "outputs": []
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "claimRefund",
-    "stateMutability": "nonpayable",
+    "name": "fundIntent",
     "inputs": [
       {
-        "name": "txKey",
-        "type": "bytes32"
+        "name": "intentId",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "outputs": []
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getIntent",
+    "inputs": [
+      {
+        "name": "intentId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct IntentraEscrow.Intent",
+        "components": [
+          {
+            "name": "id",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "customer",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "provider",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "totalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "state",
+            "type": "uint8",
+            "internalType": "enum IntentraEscrow.IntentState"
+          },
+          {
+            "name": "fundedAt",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "lastActivityAt",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "activeProposal",
+            "type": "tuple",
+            "internalType": "struct IntentraEscrow.Proposal",
+            "components": [
+              {
+                "name": "customerAmount",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "providerAmount",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "proposedAt",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "proposedBy",
+                "type": "address",
+                "internalType": "address"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getProposal",
+    "inputs": [
+      {
+        "name": "intentId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct IntentraEscrow.Proposal",
+        "components": [
+          {
+            "name": "customerAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "providerAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "proposedAt",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "proposedBy",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "nextIntentId",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "owner",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pendingOwner",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "raiseDispute",
+    "inputs": [
+      {
+        "name": "intentId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "renounceOwnership",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "resolveHumanAppeal",
+    "inputs": [
+      {
+        "name": "intentId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "customerAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "providerAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setAppealFee",
+    "inputs": [
+      {
+        "name": "newFee",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "submitAIProposal",
+    "inputs": [
+      {
+        "name": "intentId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "customerAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "providerAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "transferOwnership",
+    "inputs": [
+      {
+        "name": "newOwner",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "withdrawStuckStake",
+    "inputs": [
+      {
+        "name": "intentId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "event",
-    "name": "JobFunded",
-    "anonymous": false,
+    "name": "AIProposalSubmitted",
     "inputs": [
       {
-        "name": "txKey",
-        "type": "bytes32",
-        "indexed": true
+        "name": "intentId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "customerAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "providerAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "AbandonmentExecuted",
+    "inputs": [
+      {
+        "name": "intentId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "triggeredBy",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "AppealEscalated",
+    "inputs": [
+      {
+        "name": "intentId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "appellant",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "stake",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DisputeRaised",
+    "inputs": [
+      {
+        "name": "intentId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "raisedBy",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EIP712DomainChanged",
+    "inputs": [],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "IntentCreated",
+    "inputs": [
+      {
+        "name": "intentId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
       },
       {
         "name": "customer",
         "type": "address",
-        "indexed": true
+        "indexed": true,
+        "internalType": "address"
       },
       {
         "name": "provider",
         "type": "address",
-        "indexed": true
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
       },
       {
         "name": "amount",
         "type": "uint256",
-        "indexed": false
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "IntentFunded",
+    "inputs": [
+      {
+        "name": "intentId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
       },
       {
-        "name": "authorizationHash",
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "IntentResolved",
+    "inputs": [
+      {
+        "name": "intentId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "customerAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "providerAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OwnershipTransferStarted",
+    "inputs": [
+      {
+        "name": "previousOwner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "newOwner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OwnershipTransferred",
+    "inputs": [
+      {
+        "name": "previousOwner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "newOwner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "ECDSAInvalidSignature",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ECDSAInvalidSignatureLength",
+    "inputs": [
+      {
+        "name": "length",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ECDSAInvalidSignatureS",
+    "inputs": [
+      {
+        "name": "s",
         "type": "bytes32",
-        "indexed": false
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "IntentraEscrow__AbandonmentNotReady",
+    "inputs": [
+      {
+        "name": "readyAt",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "IntentraEscrow__AmountMismatch",
+    "inputs": [
+      {
+        "name": "summed",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        "name": "disputeWindow",
-        "type": "uint64",
-        "indexed": false
+        "name": "expected",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "IntentraEscrow__AppealWindowClosed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "IntentraEscrow__CustomerEqualsProvider",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "IntentraEscrow__DuplicateSigners",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "IntentraEscrow__InsufficientAppealStake",
+    "inputs": [
+      {
+        "name": "sent",
+        "type": "uint256",
+        "internalType": "uint256"
       },
+      {
+        "name": "required",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "IntentraEscrow__IntentNotFound",
+    "inputs": [
+      {
+        "name": "intentId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "IntentraEscrow__InvalidSigner",
+    "inputs": [
+      {
+        "name": "signer",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "IntentraEscrow__InvalidState",
+    "inputs": [
+      {
+        "name": "current",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "expected",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "IntentraEscrow__TimelockNotExpired",
+    "inputs": [
       {
         "name": "expiresAt",
-        "type": "uint64",
-        "indexed": false
-      }
-    ]
-  },
-  {
-    "type": "event",
-    "name": "EvidenceAnchored",
-    "anonymous": false,
-    "inputs": [
-      {
-        "name": "txKey",
-        "type": "bytes32",
-        "indexed": true
-      },
-      {
-        "name": "evidenceHash",
-        "type": "bytes32",
-        "indexed": false
-      }
-    ]
-  },
-  {
-    "type": "event",
-    "name": "Submitted",
-    "anonymous": false,
-    "inputs": [
-      {
-        "name": "txKey",
-        "type": "bytes32",
-        "indexed": true
-      },
-      {
-        "name": "deliverableHash",
-        "type": "bytes32",
-        "indexed": false
-      },
-      {
-        "name": "releaseAfter",
-        "type": "uint64",
-        "indexed": false
-      }
-    ]
-  },
-  {
-    "type": "event",
-    "name": "DisputeOpened",
-    "anonymous": false,
-    "inputs": [
-      {
-        "name": "txKey",
-        "type": "bytes32",
-        "indexed": true
-      },
-      {
-        "name": "complaintHash",
-        "type": "bytes32",
-        "indexed": false
-      }
-    ]
-  },
-  {
-    "type": "event",
-    "name": "Released",
-    "anonymous": false,
-    "inputs": [
-      {
-        "name": "txKey",
-        "type": "bytes32",
-        "indexed": true
-      },
-      {
-        "name": "amount",
         "type": "uint256",
-        "indexed": false
+        "internalType": "uint256"
       }
     ]
   },
   {
-    "type": "event",
-    "name": "Resolved",
-    "anonymous": false,
+    "type": "error",
+    "name": "IntentraEscrow__Unauthorized",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "IntentraEscrow__ZeroAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "IntentraEscrow__ZeroAmount",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidShortString",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "OwnableInvalidOwner",
     "inputs": [
       {
-        "name": "txKey",
-        "type": "bytes32",
-        "indexed": true
-      },
-      {
-        "name": "toProvider",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "toCustomer",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "outcomeHash",
-        "type": "bytes32",
-        "indexed": false
+        "name": "owner",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },
   {
-    "type": "event",
-    "name": "Refunded",
-    "anonymous": false,
+    "type": "error",
+    "name": "OwnableUnauthorizedAccount",
     "inputs": [
       {
-        "name": "txKey",
-        "type": "bytes32",
-        "indexed": true
-      },
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SafeERC20FailedOperation",
+    "inputs": [
       {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "StringTooLong",
+    "inputs": [
+      {
+        "name": "str",
+        "type": "string",
+        "internalType": "string"
       }
     ]
   }

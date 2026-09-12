@@ -12,7 +12,6 @@ from app.core.states import Event, EvidenceKind
 from app.domains.evidence import service as evidence
 from app.domains.fulfillment.models import Fulfillment
 from app.domains.transactions import machine
-from app.integrations.arc import client as arc_client
 
 
 async def for_transaction(s: AsyncSession, transaction_id: uuid.UUID) -> Fulfillment | None:
@@ -70,9 +69,16 @@ async def deliver_call(s: AsyncSession, tx, user_id: uuid.UUID) -> tuple[int, di
     if row is not None:
         row.deliverable_hash, row.updated_at = digest, utcnow()
         s.add(row)
-    await machine.note(s, tx, f"provider:{user_id}", "DELIVERABLE_BUILT", {"deliverable_hash": digest, "photos": len(photos)})
-    return 200, {"call": arc_client.call(get_settings().escrow_address, "submit", [tx.tx_key, digest]),
-                 "deliverable_hash": digest, "transaction": {"id": str(tx.id), "state": tx.state}}
+    row = await for_transaction(s, tx.id)
+    if row is not None:
+        row.status, row.delivered_at, row.updated_at = "DELIVERED", utcnow(), utcnow()
+        s.add(row)
+    # The canonical escrow has no submit(): delivery is Intentra's record, hashed into the audit chain, and the
+    # money still cannot move without the customer's signature or the contract's 14-day timeout.
+    await machine.apply(s, tx, Event.DELIVERY_MARKED, f"provider:{user_id}",
+                        {"deliverable_hash": digest, "photos": len(photos)})
+    return 200, {"deliverable_hash": digest, "photos": len(photos),
+                 "transaction": {"id": str(tx.id), "state": tx.state}}
 
 
 async def expected_deliverable(s: AsyncSession, transaction_id: uuid.UUID) -> str | None:

@@ -153,3 +153,24 @@ async def due_for_release(s: AsyncSession, now: datetime) -> list[uuid.UUID]:
 
 async def in_states(s: AsyncSession, states: list[str]) -> list[uuid.UUID]:
     return list((await s.exec(select(Transaction.id).where(Transaction.state.in_(states)))).all())
+
+
+# ---------------------------------------------------------------- the escrow's own identifier
+
+async def by_intent_id(s: AsyncSession, intent_id: int) -> Transaction | None:
+    """Everything on-chain is keyed by the escrow's auto-incrementing intentId, not by our tx_key."""
+    return (await s.exec(select(Transaction).where(Transaction.escrow_intent_id == int(intent_id)))).one_or_none()
+
+
+async def bind_intent_id(s: AsyncSession, tx: Transaction, intent_id: int) -> None:
+    tx.escrow_intent_id = int(intent_id)
+    s.add(tx)
+
+
+async def funded_since_before(s: AsyncSession, cutoff: datetime) -> list[uuid.UUID]:
+    """Jobs the escrow still holds money for, funded before the cutoff and not yet closed."""
+    live = [TxState.FUNDED.value, TxState.IN_PROGRESS.value, TxState.EVIDENCE_SUBMITTED.value,
+            TxState.DELIVERED.value, TxState.DISPUTED.value, TxState.RESOLVING.value, TxState.PROPOSED.value]
+    return list((await s.exec(select(Transaction.id).where(Transaction.state.in_(live),
+                                                           Transaction.funded_at.is_not(None),
+                                                           Transaction.funded_at <= cutoff))).all())

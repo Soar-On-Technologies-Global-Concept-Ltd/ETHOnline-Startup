@@ -1,34 +1,35 @@
-"A provider's on-chain history. Every number here comes from escrow events, not from Intentra's database."
+"A provider's on-chain history. Every number here comes from IntentraEscrow events, not from Intentra's database."
 type Provider @entity(immutable: false) {
   id: Bytes!                      # provider wallet address
   jobsFunded: Int!
-  jobsDelivered: Int!
-  jobsReleased: Int!
-  jobsSettled: Int!
-  jobsRefunded: Int!
+  jobsDelivered: Int!             # funded jobs that resolved with the provider paid in full
+  jobsReleased: Int!              # resolved with everything to the provider
+  jobsSettled: Int!               # resolved with the money split
+  jobsRefunded: Int!              # resolved with everything back to the customer
   disputes: Int!
-  evidenceAnchored: Int!
+  evidenceAnchored: Int!          # always 0: the canonical escrow has no anchor call
   paidOutMicroUsdc: BigInt!
   refundedMicroUsdc: BigInt!
-  secondsToEvidenceTotal: BigInt!
-  jobs: [Job!]! @derivedFrom(field: "provider")
+  secondsToEvidenceTotal: BigInt! # always 0, kept so the trust card's shape does not change
+  intents: [Intent!]! @derivedFrom(field: "provider")
 }
 
-"One escrowed job, keyed by the transaction key the backend generated."
-type Job @entity(immutable: false) {
-  id: Bytes!                      # txKey
+"One escrowed job, keyed by the escrow's own auto-incrementing intentId."
+type Intent @entity(immutable: false) {
+  id: Bytes!                      # intentId, as bytes
+  intentId: BigInt!
   provider: Provider!
   customer: Bytes!
+  token: Bytes!
   amount: BigInt!
-  authorizationHash: Bytes!
-  status: String!                 # Funded | Submitted | Disputed | Released | Resolved | Refunded
-  fundedAt: BigInt!
-  firstEvidenceAt: BigInt
-  submittedAt: BigInt
-  releaseAfter: BigInt
+  status: String!                 # AwaitingFunds | Funded | InDispute | Timelocked | Appealed | Resolved | Abandoned
+  createdAt: BigInt!
+  fundedAt: BigInt
+  disputedAt: BigInt
+  proposedAt: BigInt
+  appealedAt: BigInt
   closedAt: BigInt
   toProvider: BigInt
   toCustomer: BigInt
-  outcomeHash: Bytes
-  evidenceCount: Int!
+  appealStake: BigInt
 }

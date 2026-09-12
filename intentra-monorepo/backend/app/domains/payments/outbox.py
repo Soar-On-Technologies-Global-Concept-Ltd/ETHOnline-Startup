@@ -20,11 +20,14 @@ RESOLVER_LOCK = asyncio.Lock()
 WAKE = asyncio.Event()
 
 CALLS = {
-    "ANCHOR": ("anchorEvidence", lambda a: [hex_to_bytes(a["tx_key"]), hex_to_bytes(a["evidence_hash"])]),
-    "OPEN_DISPUTE": ("openDispute", lambda a: [hex_to_bytes(a["tx_key"]), hex_to_bytes(a["complaint_hash"])]),
-    "RELEASE": ("release", lambda a: [hex_to_bytes(a["tx_key"])]),
-    "RESOLVE": ("resolve", lambda a: [hex_to_bytes(a["tx_key"]), int(a["provider_bps"]), hex_to_bytes(a["outcome_hash"]),
-                                      hex_to_bytes(a["sig_customer"]), hex_to_bytes(a["sig_provider"])]),
+    # Everything the arbitrator key may send. It can propose a split and relay a signed resolution; it can never
+    # move money on its own, because executeWithSignatures needs two distinct signers.
+    "AI_PROPOSAL": ("submitAIProposal", lambda a: [int(a["intent_id"]), int(a["customer_amount"]),
+                                                   int(a["provider_amount"])]),
+    "EXECUTE": ("executeWithSignatures", lambda a: [int(a["intent_id"]), int(a["customer_amount"]),
+                                                    int(a["provider_amount"]), hex_to_bytes(a["sig_a"]),
+                                                    hex_to_bytes(a["sig_b"])]),
+    "ABANDONMENT": ("executeAbandonment", lambda a: [int(a["intent_id"])]),
 }
 
 

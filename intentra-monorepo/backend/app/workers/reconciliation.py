@@ -4,11 +4,10 @@ Everything here goes through the owning domain's service, so the loop never quer
 """
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.core.config import get_settings
 from app.core.db import session_scope, sessionmaker
-from app.core.errors import AppError
 from app.core.logging import log, transaction_id_var
 from app.core.states import Event, TxState
 from app.domains.authorization import service as authorization
@@ -16,7 +15,6 @@ from app.domains.disputes import service as disputes
 from app.domains.payments import outbox, resolver
 from app.domains.payments import service as payments
 from app.domains.transactions import machine
-from app.domains.transactions import policy as tx_policy
 from app.domains.transactions import service as transactions
 from app.integrations.arc import client as arc_client
 from app.orchestration import chain_events
@@ -33,36 +31,32 @@ async def _block_now() -> datetime | None:
         return None
 
 
-async def auto_release() -> int:
+async def force_abandoned() -> int:
+    """The escrow's own backstop: after fourteen days of silence anyone may close the intent, so we do it.
+
+    There is no `release` on the canonical contract, so a delivered job that the customer never signs for is not
+    released automatically — it waits for a signature or for this timeout. That is the contract's design.
+    """
     now = await _block_now()
     if now is None:
         return 0
+    cutoff = now - timedelta(days=14)
     async with sessionmaker()() as s:
-        due = await transactions.due_for_release(s, now)
-    released = 0
-    for tx_id in due:
+        stale = await transactions.funded_since_before(s, cutoff)
+    forced = 0
+    for tx_id in stale:
         async with session_scope() as s:
             tx = await machine.lock(s, tx_id)
             transaction_id_var.set(str(tx.id))
-            if tx.state != TxState.DELIVERED.value or tx.release_after is None or tx.release_after > now:
+            if tx.escrow_intent_id is None or tx.funded_at is None or tx.funded_at > cutoff:
                 continue
-            if await disputes.for_transaction(s, tx.id) is not None:
+            if await payments.has_execute_queued(s, tx.id):
                 continue
-            if await payments.has_release_queued(s, tx.id):
-                continue
-            try:
-                await tx_policy.enforce(tx, "system:reconciliation",
-                                        tx_policy.Action(kind="release", state=tx.state, currency=tx.currency,
-                                                         amount_minor=int(tx.amount_minor or 0)),
-                                        tx_policy.context(tx, await authorization.view(s, tx.id)))
-            except AppError as err:
-                log(logger, "auto-release refused by policy", transaction=str(tx.id), reason=getattr(err, "code", None))
-                continue
-            queued = await resolver.queue_release(s, tx.id, tx.tx_key)
+            queued = await resolver.queue_abandonment(s, tx.id, tx.escrow_intent_id)
             await machine.note(s, tx, "system:reconciliation", "TX_QUEUED",
-                               {"kind": "RELEASE", "chain_tx_id": queued.id, "reason": "dispute window closed"})
-            released += 1
-    return released
+                               {"kind": "ABANDONMENT", "chain_tx_id": queued.id, "reason": "fourteen days of silence"})
+            forced += 1
+    return forced
 
 
 async def expire_authorizations() -> int:
@@ -141,7 +135,7 @@ async def close_late_disputes() -> int:
 
 
 async def once() -> dict:
-    counts = {"released": await auto_release(), "expired": await expire_authorizations(),
+    counts = {"abandoned": await force_abandoned(), "expired": await expire_authorizations(),
               "response_timeouts": await response_timeouts(), "accept_timeouts": await acceptance_timeouts(),
               "ladders": await run_pending_ladders(), "late_disputes": await close_late_disputes()}
     for raw in await outbox.recheck_sent():

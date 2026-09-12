@@ -23,10 +23,10 @@ class Settings(BaseSettings):
     # Arc
     arc_rpc_url: str = "https://rpc.testnet.arc.io"
     arc_chain_id: int = 5042002
-    escrow_address: str = "0x0000000000000000000000000000000000000000"
+    escrow_address: str = "0xeF3a099CC877F6e274b037847A6ee44C4d62648D"   # live on Arc testnet
     escrow_deploy_block: int = 0
-    usdc_address: str = "0x3600000000000000000000000000000000000000"
-    resolver_private_key: SecretStr | None = None
+    usdc_address: str = "0xFa5a5744898B71c93fF80F179d95184864143190"     # the escrow's 6-decimal mock USDC
+    resolver_private_key: SecretStr | None = None   # the AI arbitrator key: one of the three signers
     confirmations: int = 1
     explorer_base_url: str = "https://testnet.arcscan.app"
     min_max_fee_gwei: int = 20

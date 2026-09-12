@@ -91,20 +91,28 @@ async def awaiting_authorization(client) -> dict:
 async def in_progress(client) -> str:
     """Walk all the way to a started job: approved over HTTP, funded by a confirmed escrow event, then started."""
     created = await awaiting_authorization(client)
-    tx_id, tx_key = created["transaction"]["id"], created["transaction"]["tx_key"]
+    tx_id = created["transaction"]["id"]
     signature = sign_authorization(created["authorization_typed_data"], ADA.key)
     approved = await client.post(f"/v1/transactions/{tx_id}/authorize",
                                  json={"signature": signature, "idkit_result": proof()},
                                  headers={**auth(ADA_TOKEN), "Idempotency-Key": str(uuid.uuid4())})
     assert approved.status_code == 200, approved.text
-    funding = await client.post(f"/v1/transactions/{tx_id}/fund", json={},
+    # Funding is two phases on the canonical escrow: createIntent assigns the id, then approve + fundIntent.
+    created = await client.post(f"/v1/transactions/{tx_id}/fund", json={},
                                 headers={**auth(ADA_TOKEN), "Idempotency-Key": str(uuid.uuid4())})
-    args = funding.json()["calls"][1]["args"]
-    await handle_log(DecodedLog(name="JobFunded", tx_hash="0x" + uuid.uuid4().hex * 2, log_index=0, block_number=100,
-                                contract=get_settings().escrow_address.lower(), tx_key=tx_key.lower(),
-                                args={"txKey": tx_key.lower(), "customer": ADA.address.lower(), "provider": args[1].lower(),
-                                      "amount": int(args[2]), "authorizationHash": args[3], "disputeWindow": int(args[4]),
-                                      "expiresAt": int(args[5])}))
+    assert created.json()["step"] == "create_intent", created.text
+    create_hash = "0x" + uuid.uuid4().hex * 2
+    await client.post(f"/v1/transactions/{tx_id}/fund", json={"tx_hash": create_hash},
+                      headers={**auth(ADA_TOKEN), "Idempotency-Key": str(uuid.uuid4())})
+    intent_id = uuid.uuid4().int % 100_000
+    await handle_log(DecodedLog(name="IntentCreated", tx_hash=create_hash, log_index=0, block_number=100,
+                                contract=get_settings().escrow_address.lower(), tx_key=str(intent_id),
+                                args={"intentId": intent_id, "customer": ADA.address.lower(),
+                                      "provider": TUNDE.address.lower(),
+                                      "token": get_settings().usdc_address.lower(), "amount": 100_000_000}))
+    await handle_log(DecodedLog(name="IntentFunded", tx_hash="0x" + uuid.uuid4().hex * 2, log_index=0, block_number=101,
+                                contract=get_settings().escrow_address.lower(), tx_key=str(intent_id),
+                                args={"intentId": intent_id, "amount": 100_000_000}))
     started = await client.post(f"/v1/transactions/{tx_id}/start", headers=auth(TUNDE_TOKEN))
     assert started.status_code == 200, started.text
     return tx_id

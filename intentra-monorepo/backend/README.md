@@ -14,7 +14,7 @@ FastAPI modular monolith with three services, exactly the MVP scope declared in
 |---|---|---|
 | AgentService | `app/services/ai/` | Claude (`claude-opus-5`) — structured output, no tools, no authority |
 | TrustService | `app/services/trust/` | The Graph — `subgraph/intentra-arc` on Arc, live data only |
-| PaymentService | `app/services/blockchain/` | Arc — `IntentraEscrow` + USDC (6-decimal ERC-20 interface) |
+| PaymentService | `app/domains/payments/` | Arc — the canonical `IntentraEscrow`, live on testnet |
 | Identity | `app/services/identity/` | Privy (email login, embedded wallets, EIP-712) · World Selfie Check |
 
 The full design, every diagram and every rule: `docs/16_Intentra_ETHOnline_Backend_Schematics.docx`.
@@ -119,14 +119,45 @@ app/
 Adding a feature usually means touching one folder. Splitting a domain out into its own service later means moving one
 folder and replacing its service calls with HTTP — which is the point.
 
+## The escrow
+
+The contract is **not** in this directory. It lives in [`intentra-monorepo/contracts`](../contracts) and is owned by
+the contracts team; this backend integrates with the ABI they publish in `contracts/exports/intentra-contracts.ts`,
+vendored here as `shared/abi/IntentraEscrow.json`.
+
+Live on Arc testnet (chain 5042002): escrow `0xeF3a099CC877F6e274b037847A6ee44C4d62648D`, USDC (6 dp)
+`0xFa5a5744898B71c93fF80F179d95184864143190`.
+
+What that contract's shape means for this backend:
+
+- **Jobs are keyed by the escrow's own `uint256 intentId`**, not by our `tx_key`. `createIntent` assigns it, so
+  funding is two phases: the wallet sends `createIntent` and reports the hash, the watcher reads `IntentCreated` to
+  learn the id (`transactions.escrow_intent_id`), and only then does the API return `approve` + `fundIntent`.
+- **There is no `release`.** Paying the provider in full is a resolution: the customer signs `ResolveIntent`
+  (0 to the customer, everything to the provider) and the arbitrator key co-signs, which is two of the three
+  signers `executeWithSignatures` requires.
+- **There is no `submit` and no `anchorEvidence`.** Delivery is Intentra's own record, and evidence is hashed,
+  stored privately and written into the audit chain — it is not anchored on-chain, so `EvidenceAnchored` is no
+  longer a trust source. Trust now comes from funded, resolved, disputed and refunded counts.
+- **Settlement uses exact amounts**, not basis points. `REMEDY_BPS` still decides the split internally; the amounts
+  it produces are what both parties sign and what the contract pays.
+- **Two of three signers.** The set is {customer, provider, AI arbitrator} and the two must be distinct, so the
+  arbitrator key alone can never pay anyone. Splits in this backend are signed by both humans; the arbitrator only
+  relays the transaction. Worth knowing: the contract *would* accept AI + one party, and `executeAbandonment`
+  executes a standing AI proposal after 14 days of silence (full refund to the customer if there is no proposal).
+- **The dispute clock is the contract's**: `submitAIProposal` starts a 48-hour window in which either party can pay
+  a stake to escalate to a human, and the owner settles appeals with `resolveHumanAppeal`.
+- **Nothing auto-releases.** A delivered job that the customer never signs for waits for a signature or for the
+  14-day abandonment timeout; the reconciliation worker queues that timeout rather than a release.
+
 ## Tests
 
 ```bash
 pytest                    # pure: transitions, policy, money, hashing, EIP-712, World vectors, AI validation, trust, evidence
 pytest -m db              # both demo paths end to end, plus the abuse cases in tests/test_security_db.py
 lint-imports              # 14 architecture contracts: layering, kernel purity, thin routers, private tables
-cd contracts && forge install foundry-rs/forge-std && forge test   # 24 tests: conservation, access control,
-                          # settle-once, cross-job signature replay, a stolen resolver key, refunds
+# the escrow itself lives in intentra-monorepo/contracts and is owned by the contracts team:
+cd ../contracts && forge test
 ```
 
 `shared/eip712.vectors.json` is signed by the same fixed key in the API and web test suites, so both check the same bytes.
@@ -142,8 +173,9 @@ The abuse cases are tests, not prose — `tests/test_security_db.py` drives them
   different body, a forged webhook HMAC and a forged evidence link are each refused.
 - The dev-only chain simulator is unreachable unless `ENV=dev`, even with a correct HMAC.
 - Uploads are sniffed from their bytes, not their `Content-Type`, and are refused before the job starts.
-- On-chain: a stolen resolver key cannot settle alone, cannot forge a party's signature, cannot pay a third party
-  and cannot replay a resolution signed for another job. Every split conserves the amount (fuzzed).
+- On-chain: `executeWithSignatures` needs two distinct signers from {customer, provider, arbitrator} and the
+  amounts must sum to the escrow, so a stolen arbitrator key cannot pay anyone by itself; `ResolveIntent` binds
+  each signature to one `intentId` and one pair of amounts, so nothing replays onto another job.
 - Staging and production refuse to start with the sample secrets or with any partner in `fake` mode.
 
 ## Deploying

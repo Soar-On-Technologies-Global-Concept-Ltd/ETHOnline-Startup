@@ -1,8 +1,13 @@
 import { BigInt, Bytes } from "@graphprotocol/graph-ts";
 import {
-  JobFunded, EvidenceAnchored, Submitted, DisputeOpened, Released, Resolved, Refunded,
+  IntentCreated, IntentFunded, DisputeRaised, AIProposalSubmitted, AppealEscalated, IntentResolved,
+  AbandonmentExecuted,
 } from "../generated/IntentraEscrow/IntentraEscrow";
-import { Provider, Job } from "../generated/schema";
+import { Provider, Intent } from "../generated/schema";
+
+function key(intentId: BigInt): Bytes {
+  return Bytes.fromByteArray(Bytes.fromBigInt(intentId));
+}
 
 function loadProvider(address: Bytes): Provider {
   let provider = Provider.load(address);
@@ -14,7 +19,7 @@ function loadProvider(address: Bytes): Provider {
     provider.jobsSettled = 0;
     provider.jobsRefunded = 0;
     provider.disputes = 0;
-    provider.evidenceAnchored = 0;
+    provider.evidenceAnchored = 0;          // the canonical escrow has no anchor call
     provider.paidOutMicroUsdc = BigInt.zero();
     provider.refundedMicroUsdc = BigInt.zero();
     provider.secondsToEvidenceTotal = BigInt.zero();
@@ -22,104 +27,91 @@ function loadProvider(address: Bytes): Provider {
   return provider as Provider;
 }
 
-export function handleJobFunded(event: JobFunded): void {
+export function handleIntentCreated(event: IntentCreated): void {
   const provider = loadProvider(event.params.provider);
+  provider.save();
+
+  const intent = new Intent(key(event.params.intentId));
+  intent.intentId = event.params.intentId;
+  intent.provider = provider.id;
+  intent.customer = event.params.customer;
+  intent.token = event.params.token;
+  intent.amount = event.params.amount;
+  intent.status = "AwaitingFunds";
+  intent.createdAt = event.block.timestamp;
+  intent.save();
+}
+
+export function handleIntentFunded(event: IntentFunded): void {
+  const intent = Intent.load(key(event.params.intentId));
+  if (intent == null) return;
+  intent.status = "Funded";
+  intent.fundedAt = event.block.timestamp;
+  intent.save();
+
+  const provider = loadProvider(intent.provider);
   provider.jobsFunded += 1;
   provider.save();
-
-  const job = new Job(event.params.txKey);
-  job.provider = provider.id;
-  job.customer = event.params.customer;
-  job.amount = event.params.amount;
-  job.authorizationHash = event.params.authorizationHash;
-  job.status = "Funded";
-  job.fundedAt = event.block.timestamp;
-  job.evidenceCount = 0;
-  job.save();
 }
 
-export function handleEvidenceAnchored(event: EvidenceAnchored): void {
-  const job = Job.load(event.params.txKey);
-  if (job == null) return;
-  job.evidenceCount += 1;
-  const provider = loadProvider(job.provider);
-  provider.evidenceAnchored += 1;
-  if (job.firstEvidenceAt === null) {
-    job.firstEvidenceAt = event.block.timestamp;
-    provider.secondsToEvidenceTotal = provider.secondsToEvidenceTotal.plus(
-      event.block.timestamp.minus(job.fundedAt));
-  }
-  provider.save();
-  job.save();
-}
+export function handleDisputeRaised(event: DisputeRaised): void {
+  const intent = Intent.load(key(event.params.intentId));
+  if (intent == null) return;
+  intent.status = "InDispute";
+  intent.disputedAt = event.block.timestamp;
+  intent.save();
 
-export function handleSubmitted(event: Submitted): void {
-  const job = Job.load(event.params.txKey);
-  if (job == null) return;
-  job.status = "Submitted";
-  job.submittedAt = event.block.timestamp;
-  job.releaseAfter = BigInt.fromU64(event.params.releaseAfter);
-  job.save();
-
-  const provider = loadProvider(job.provider);
-  provider.jobsDelivered += 1;
-  provider.save();
-}
-
-export function handleDisputeOpened(event: DisputeOpened): void {
-  const job = Job.load(event.params.txKey);
-  if (job == null) return;
-  job.status = "Disputed";
-  job.save();
-
-  const provider = loadProvider(job.provider);
+  const provider = loadProvider(intent.provider);
   provider.disputes += 1;
   provider.save();
 }
 
-export function handleReleased(event: Released): void {
-  const job = Job.load(event.params.txKey);
-  if (job == null) return;
-  job.status = "Released";
-  job.closedAt = event.block.timestamp;
-  job.toProvider = event.params.amount;
-  job.toCustomer = BigInt.zero();
-  job.save();
+export function handleAIProposalSubmitted(event: AIProposalSubmitted): void {
+  const intent = Intent.load(key(event.params.intentId));
+  if (intent == null) return;
+  intent.status = "Timelocked";
+  intent.proposedAt = event.block.timestamp;
+  intent.toCustomer = event.params.customerAmount;
+  intent.toProvider = event.params.providerAmount;
+  intent.save();
+}
 
-  const provider = loadProvider(job.provider);
-  provider.jobsReleased += 1;
-  provider.paidOutMicroUsdc = provider.paidOutMicroUsdc.plus(event.params.amount);
+export function handleAppealEscalated(event: AppealEscalated): void {
+  const intent = Intent.load(key(event.params.intentId));
+  if (intent == null) return;
+  intent.status = "Appealed";
+  intent.appealedAt = event.block.timestamp;
+  intent.appealStake = event.params.stake;
+  intent.save();
+}
+
+export function handleIntentResolved(event: IntentResolved): void {
+  const intent = Intent.load(key(event.params.intentId));
+  if (intent == null) return;
+  intent.status = "Resolved";
+  intent.closedAt = event.block.timestamp;
+  intent.toCustomer = event.params.customerAmount;
+  intent.toProvider = event.params.providerAmount;
+  intent.save();
+
+  const provider = loadProvider(intent.provider);
+  provider.paidOutMicroUsdc = provider.paidOutMicroUsdc.plus(event.params.providerAmount);
+  provider.refundedMicroUsdc = provider.refundedMicroUsdc.plus(event.params.customerAmount);
+  if (event.params.customerAmount.isZero()) {
+    provider.jobsReleased += 1;
+    provider.jobsDelivered += 1;
+  } else if (event.params.providerAmount.isZero()) {
+    provider.jobsRefunded += 1;
+  } else {
+    provider.jobsSettled += 1;
+  }
   provider.save();
 }
 
-export function handleResolved(event: Resolved): void {
-  const job = Job.load(event.params.txKey);
-  if (job == null) return;
-  job.status = "Resolved";
-  job.closedAt = event.block.timestamp;
-  job.toProvider = event.params.toProvider;
-  job.toCustomer = event.params.toCustomer;
-  job.outcomeHash = event.params.outcomeHash;
-  job.save();
-
-  const provider = loadProvider(job.provider);
-  provider.jobsSettled += 1;
-  provider.paidOutMicroUsdc = provider.paidOutMicroUsdc.plus(event.params.toProvider);
-  provider.refundedMicroUsdc = provider.refundedMicroUsdc.plus(event.params.toCustomer);
-  provider.save();
-}
-
-export function handleRefunded(event: Refunded): void {
-  const job = Job.load(event.params.txKey);
-  if (job == null) return;
-  job.status = "Refunded";
-  job.closedAt = event.block.timestamp;
-  job.toProvider = BigInt.zero();
-  job.toCustomer = event.params.amount;
-  job.save();
-
-  const provider = loadProvider(job.provider);
-  provider.jobsRefunded += 1;
-  provider.refundedMicroUsdc = provider.refundedMicroUsdc.plus(event.params.amount);
-  provider.save();
+export function handleAbandonmentExecuted(event: AbandonmentExecuted): void {
+  const intent = Intent.load(key(event.params.intentId));
+  if (intent == null) return;
+  intent.status = "Abandoned";
+  intent.closedAt = event.block.timestamp;
+  intent.save();
 }
