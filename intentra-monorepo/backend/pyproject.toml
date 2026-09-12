@@ -1,0 +1,143 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "intentra-backend"
+version = "0.1.0"
+description = "Intentra FastAPI backend for ETHOnline 2026: AgentService, TrustService and PaymentService on Arc, The Graph, Privy and World Selfie Check"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "sqlmodel>=0.0.22",
+  "sqlalchemy[asyncio]>=2.0.36",
+  "asyncpg>=0.30",
+  "alembic>=1.14",
+  "pydantic>=2.9",
+  "pydantic-settings>=2.6",
+  "httpx>=0.27",
+  "web3>=8.0,<9",
+  "eth-account>=0.13",
+  "pyjwt[crypto]>=2.9",
+  "pillow>=11.0",
+  "python-multipart>=0.0.12",
+  "anthropic>=1.0,<2",
+  "boto3>=1.35",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "pytest-asyncio>=0.24", "import-linter>=2.1"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+markers = ["db: needs a Postgres database (TEST_DATABASE_URL)"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.importlinter]
+root_package = "app"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Layered: system and workers on top, then orchestration, domains, adapters, kernel"
+type = "layers"
+layers = ["app.system", "app.workers", "app.orchestration", "app.domains", "app.integrations", "app.core"]
+
+[[tool.importlinter.contracts]]
+name = "The shared kernel knows nothing about domains, adapters or the web"
+type = "forbidden"
+source_modules = ["app.core"]
+forbidden_modules = ["app.domains", "app.integrations", "app.orchestration", "app.workers", "app.system", "app.main"]
+
+[[tool.importlinter.contracts]]
+name = "Adapters never reach back into the domains"
+type = "forbidden"
+source_modules = ["app.integrations"]
+forbidden_modules = ["app.domains", "app.orchestration", "app.workers", "app.system", "app.main"]
+
+[[tool.importlinter.contracts]]
+name = "Domain rules stay pure: no I/O in money, hashing, states, remedies or policy"
+type = "forbidden"
+source_modules = ["app.core.money", "app.core.hashing", "app.core.states", "app.core.remedies", "app.core.policy"]
+forbidden_modules = ["fastapi", "sqlalchemy", "sqlmodel", "httpx", "web3"]
+
+[[tool.importlinter.contracts]]
+name = "Routers stay thin: no partner adapters behind a route"
+type = "forbidden"
+source_modules = ["app.domains.identity.router", "app.domains.providers.router", "app.domains.intents.router", "app.domains.transactions.router", "app.domains.authorization.router", "app.domains.payments.router", "app.domains.fulfillment.router", "app.domains.evidence.router", "app.domains.disputes.router", "app.system.webhooks", "app.domains.disputes.complaints"]
+forbidden_modules = ["app.integrations.privy", "app.integrations.world", "app.integrations.arc.client",
+                     "app.integrations.storage", "app.integrations.graph"]
+allow_indirect_imports = true
+
+# Every table is private to its domain: another domain asks that domain's service instead of querying its rows.
+# The one deliberate exception is `transactions.models`. The Transaction is the aggregate root the whole product is
+# built around, so other domains legitimately hold and pass one; the state machine remains its only writer, and
+# tests/test_single_writer.py proves that by scanning the tree.
+
+[[tool.importlinter.contracts]]
+name = "Only the identity domain touches identity tables"
+type = "forbidden"
+source_modules = ["app.domains.providers", "app.domains.intents", "app.domains.transactions", "app.domains.authorization", "app.domains.payments", "app.domains.fulfillment", "app.domains.evidence", "app.domains.disputes", "app.domains.audit", "app.orchestration", "app.workers", "app.system"]
+forbidden_modules = ["app.domains.identity.models"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Only the providers domain touches providers tables"
+type = "forbidden"
+source_modules = ["app.domains.identity", "app.domains.intents", "app.domains.transactions", "app.domains.authorization", "app.domains.payments", "app.domains.fulfillment", "app.domains.evidence", "app.domains.disputes", "app.domains.audit", "app.orchestration", "app.workers", "app.system"]
+forbidden_modules = ["app.domains.providers.models"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Only the intents domain touches intents tables"
+type = "forbidden"
+source_modules = ["app.domains.identity", "app.domains.providers", "app.domains.transactions", "app.domains.authorization", "app.domains.payments", "app.domains.fulfillment", "app.domains.evidence", "app.domains.disputes", "app.domains.audit", "app.orchestration", "app.workers", "app.system"]
+forbidden_modules = ["app.domains.intents.models"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Only the authorization domain touches authorization tables"
+type = "forbidden"
+source_modules = ["app.domains.identity", "app.domains.providers", "app.domains.intents", "app.domains.transactions", "app.domains.payments", "app.domains.fulfillment", "app.domains.evidence", "app.domains.disputes", "app.domains.audit", "app.orchestration", "app.workers", "app.system"]
+forbidden_modules = ["app.domains.authorization.models"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Only the payments domain touches payments tables"
+type = "forbidden"
+source_modules = ["app.domains.identity", "app.domains.providers", "app.domains.intents", "app.domains.transactions", "app.domains.authorization", "app.domains.fulfillment", "app.domains.evidence", "app.domains.disputes", "app.domains.audit", "app.orchestration", "app.workers", "app.system"]
+forbidden_modules = ["app.domains.payments.models"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Only the fulfillment domain touches fulfillment tables"
+type = "forbidden"
+source_modules = ["app.domains.identity", "app.domains.providers", "app.domains.intents", "app.domains.transactions", "app.domains.authorization", "app.domains.payments", "app.domains.evidence", "app.domains.disputes", "app.domains.audit", "app.orchestration", "app.workers", "app.system"]
+forbidden_modules = ["app.domains.fulfillment.models"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Only the evidence domain touches evidence tables"
+type = "forbidden"
+source_modules = ["app.domains.identity", "app.domains.providers", "app.domains.intents", "app.domains.transactions", "app.domains.authorization", "app.domains.payments", "app.domains.fulfillment", "app.domains.disputes", "app.domains.audit", "app.orchestration", "app.workers", "app.system"]
+forbidden_modules = ["app.domains.evidence.models"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Only the disputes domain touches disputes tables"
+type = "forbidden"
+source_modules = ["app.domains.identity", "app.domains.providers", "app.domains.intents", "app.domains.transactions", "app.domains.authorization", "app.domains.payments", "app.domains.fulfillment", "app.domains.evidence", "app.domains.audit", "app.orchestration", "app.workers", "app.system"]
+forbidden_modules = ["app.domains.disputes.models"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Only the audit domain touches audit tables"
+type = "forbidden"
+source_modules = ["app.domains.identity", "app.domains.providers", "app.domains.intents", "app.domains.transactions", "app.domains.authorization", "app.domains.payments", "app.domains.fulfillment", "app.domains.evidence", "app.domains.disputes", "app.orchestration", "app.workers", "app.system"]
+forbidden_modules = ["app.domains.audit.models"]
+allow_indirect_imports = true

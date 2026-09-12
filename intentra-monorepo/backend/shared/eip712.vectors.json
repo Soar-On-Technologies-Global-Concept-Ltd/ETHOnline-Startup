@@ -1,0 +1,130 @@
+{
+  "note": "Sign these with the private key below; the web and API test suites check the same bytes.",
+  "private_key": "0x1111111111111111111111111111111111111111111111111111111111111111",
+  "address": "0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A",
+  "vectors": [
+    {
+      "name": "Authorization",
+      "typed_data": {
+        "types": {
+          "EIP712Domain": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "version",
+              "type": "string"
+            },
+            {
+              "name": "chainId",
+              "type": "uint256"
+            },
+            {
+              "name": "verifyingContract",
+              "type": "address"
+            }
+          ],
+          "Authorization": [
+            {
+              "name": "txKey",
+              "type": "bytes32"
+            },
+            {
+              "name": "customer",
+              "type": "address"
+            },
+            {
+              "name": "provider",
+              "type": "address"
+            },
+            {
+              "name": "maxAmount",
+              "type": "uint256"
+            },
+            {
+              "name": "scopeHash",
+              "type": "bytes32"
+            },
+            {
+              "name": "expiresAt",
+              "type": "uint64"
+            }
+          ]
+        },
+        "primaryType": "Authorization",
+        "domain": {
+          "name": "Intentra",
+          "version": "1",
+          "chainId": 5042002,
+          "verifyingContract": "0x00000000000000000000000000000000000e5c70"
+        },
+        "message": {
+          "txKey": "0x2222222222222222222222222222222222222222222222222222222222222222",
+          "customer": "0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A",
+          "provider": "0x5555555555555555555555555555555555555555",
+          "maxAmount": 100000000,
+          "scopeHash": "0x3333333333333333333333333333333333333333333333333333333333333333",
+          "expiresAt": 1757707200
+        }
+      },
+      "struct_hash": "0x6c60264b7ce918e3954352fd880729489f98d53216b45ccde86e38f3afbf18db",
+      "digest": "0x3e237af9b5cb221bf50c1219544284e7daff1d477cc7e600aea775cde41a0222",
+      "signature": "0xd725caca922ccfc78931c6700744df5c32b804114481452e84f400e36cfea78c33ad64b526d646c439d1efa6172c2e407a2dfde051f2f9b975c8479f2a78587a1c"
+    },
+    {
+      "name": "Resolution",
+      "typed_data": {
+        "types": {
+          "EIP712Domain": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "version",
+              "type": "string"
+            },
+            {
+              "name": "chainId",
+              "type": "uint256"
+            },
+            {
+              "name": "verifyingContract",
+              "type": "address"
+            }
+          ],
+          "Resolution": [
+            {
+              "name": "txKey",
+              "type": "bytes32"
+            },
+            {
+              "name": "providerBps",
+              "type": "uint16"
+            },
+            {
+              "name": "outcomeHash",
+              "type": "bytes32"
+            }
+          ]
+        },
+        "primaryType": "Resolution",
+        "domain": {
+          "name": "Intentra",
+          "version": "1",
+          "chainId": 5042002,
+          "verifyingContract": "0x00000000000000000000000000000000000e5c70"
+        },
+        "message": {
+          "txKey": "0x2222222222222222222222222222222222222222222222222222222222222222",
+          "providerBps": 7000,
+          "outcomeHash": "0x4444444444444444444444444444444444444444444444444444444444444444"
+        }
+      },
+      "struct_hash": "0x28fb4e8d6085a781af2c576978c52807036c59e5fda4d931e1e4a4a929933cc0",
+      "digest": "0x3dd7bb3e7ceaf09f368102320078c90578ddb240e500a48c4f15a42a220ab8d8",
+      "signature": "0x00bdf790f58692ce1a8a30d26d773d23997da97593136e150b2b47bdfbce49f51a7aff57bd1a3e2897b977674979353c26bdffb84dae35a18f4999faaf9f859b1b"
+    }
+  ]
+}
