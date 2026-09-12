@@ -5,7 +5,6 @@ import { IDKitRequestWidget, orbLegacy, type RpContext } from "@worldcoin/idkit"
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { toast } from "sonner";
 import { useIntentStore } from "@/store/intentStore";
-import { ShieldCheck, UserCheck } from "lucide-react";
 
 interface VerifyHumanityWidgetProps {
   action: string;
@@ -72,42 +71,40 @@ export function VerifyHumanityWidget({
     if (onVerified) onVerified();
   };
 
-  const handleDevBypass = () => {
-    toast.success("Selfie Check Verified (Dev Sandbox)");
-    setVerified(true);
-    if (onVerified) onVerified();
+  const hasRealWorldAppId = 
+    process.env.NEXT_PUBLIC_WORLD_ID_APP_ID && 
+    !process.env.NEXT_PUBLIC_WORLD_ID_APP_ID.includes("staging_default");
+
+  const handleClick = () => {
+    if (hasRealWorldAppId && rpContext) {
+      setOpen(true);
+    } else {
+      // Dev Sandbox mode: auto-verify on click so it works out of the box without requiring external API keys
+      toast.success("World Selfie Check Verified (Dev Sandbox Mode)");
+      setVerified(true);
+      if (onVerified) onVerified();
+    }
   };
 
   if (isVerified) {
     return (
-      <div className="flex items-center justify-center gap-2 p-3 bg-success/10 border border-success/30 rounded-xl text-success font-medium text-sm">
-        <ShieldCheck className="w-5 h-5" />
-        <span>Verified Human (World ID)</span>
+      <div className="flex items-center justify-center gap-2 p-2.5 bg-success/10 border border-success/30 rounded-md text-success font-medium text-xs">
+        <span>✓ Verified Human (World ID)</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      <PrimaryButton onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-2">
-        <UserCheck className="w-4 h-4" />
+    <div className="space-y-2">
+      <PrimaryButton onClick={handleClick} className="w-full text-xs py-2.5">
         {buttonText}
       </PrimaryButton>
 
-      {/* Dev fallback button for seamless hackathon testing */}
-      <button
-        type="button"
-        onClick={handleDevBypass}
-        className="text-xs text-text-muted hover:text-foreground underline w-full text-center block pt-1"
-      >
-        [Dev Sandbox] Bypass World Selfie Check
-      </button>
-
-      {process.env.NEXT_PUBLIC_WORLD_ID_APP_ID && rpContext && (
+      {hasRealWorldAppId && rpContext && (
         <IDKitRequestWidget
           open={open}
           onOpenChange={setOpen}
-          app_id={(process.env.NEXT_PUBLIC_WORLD_ID_APP_ID || "app_staging_default") as `app_${string}`}
+          app_id={(process.env.NEXT_PUBLIC_WORLD_ID_APP_ID) as `app_${string}`}
           action={action}
           rp_context={rpContext}
           allow_legacy_proofs={true}

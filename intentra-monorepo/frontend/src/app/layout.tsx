@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
-import { Inter, Outfit } from "next/font/google";
+import { Exo_2 } from "next/font/google";
 import { Toaster } from "sonner";
 import { PrivyProviderWrapper } from "@/components/providers/PrivyProviderWrapper";
+import { AppShell } from "@/components/layout/AppShell";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-const outfit = Outfit({ subsets: ["latin"], variable: "--font-display" });
+const exo2 = Exo_2({ 
+  subsets: ["latin"], 
+  variable: "--font-exo2",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Intentra",
@@ -19,9 +23,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.variable} ${outfit.variable} font-sans antialiased bg-background text-foreground min-h-screen`}>
+      <body className={`${exo2.variable} font-sans antialiased bg-background text-foreground min-h-screen`}>
         <PrivyProviderWrapper>
-          {children}
+          <AppShell>
+            {children}
+          </AppShell>
           <Toaster theme="dark" position="bottom-right" />
         </PrivyProviderWrapper>
       </body>

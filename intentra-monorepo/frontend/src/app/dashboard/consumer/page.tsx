@@ -2,12 +2,14 @@
 
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { SolidCard } from "@/components/ui/SolidCard";
+import { QuoteCard } from "@/components/ui/QuoteCard";
 import { ArrowRight, Search } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { parseAndCreateIntent, Intent } from "@/lib/api";
 
 export default function ConsumerDashboard() {
   const { ready, authenticated, user } = usePrivy();
@@ -15,7 +17,7 @@ export default function ConsumerDashboard() {
 
   const [prompt, setPrompt] = useState("Find a verified photographer for my event, max $150.");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [parsedResult, setParsedResult] = useState<any>(null);
+  const [intent, setIntent] = useState<Intent | null>(null);
 
   useEffect(() => {
     if (ready && !authenticated) {
@@ -23,24 +25,13 @@ export default function ConsumerDashboard() {
     }
   }, [ready, authenticated, router]);
 
-  const handleAnalyzeIntent = (inputPrompt: string) => {
+  const handleAnalyzeIntent = async (inputPrompt: string) => {
     setIsAnalyzing(true);
-    setParsedResult(null);
+    setIntent(null);
 
-    setTimeout(() => {
-      setIsAnalyzing(false);
-      setParsedResult({
-        service: "Event Photography",
-        city: "San Francisco / Remote Event",
-        maxUsd: 150,
-        window: "This Saturday",
-        providers: [
-          { id: "p1", name: "Apex Photography Studio", trustScore: 98, jobs: 142, quote: 145, recommended: true },
-          { id: "p2", name: "FocusCraft Media", trustScore: 94, jobs: 89, quote: 150, recommended: false },
-          { id: "p3", name: "Lumina Event Shots", trustScore: 91, jobs: 54, quote: 135, recommended: false },
-        ]
-      });
-    }, 1000);
+    const result = await parseAndCreateIntent(inputPrompt);
+    setIsAnalyzing(false);
+    setIntent(result);
   };
 
   useEffect(() => {
@@ -63,7 +54,7 @@ export default function ConsumerDashboard() {
       {/* Header Bar */}
       <header className="mb-10 flex justify-between items-center pb-6 border-b border-white/10">
         <div>
-          <span className="text-xs font-mono uppercase tracking-widest text-text-muted font-medium">Consumer Studio</span>
+          <span className="text-xs font-mono uppercase tracking-widest text-text-muted font-medium">Seeker Studio</span>
           <h1 className="font-display text-2xl md:text-3xl font-bold tracking-tight mt-1">Intent & Scope Engine</h1>
         </div>
         <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-white/5 border border-white/10 text-xs font-mono">
@@ -128,7 +119,7 @@ export default function ConsumerDashboard() {
 
       {/* AI Analysis & Provider Recommendations */}
       <AnimatePresence mode="wait">
-        {parsedResult && (
+        {intent && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -138,22 +129,25 @@ export default function ConsumerDashboard() {
           >
             {/* Structured Intent Card */}
             <SolidCard variant="glass" className="p-5 rounded-lg border-l-2 border-l-white">
-              <span className="text-xs font-mono uppercase tracking-widest text-text-muted block mb-3 font-semibold">
-                Deterministic Intent Schema
-              </span>
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-xs font-mono uppercase tracking-widest text-text-muted font-semibold">
+                  Deterministic Intent Schema
+                </span>
+                <span className="text-xs font-mono text-text-muted">Intent ID: {intent.id}</span>
+              </div>
               
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-3 border-y border-white/10 font-mono text-xs">
                 <div>
                   <span className="text-text-muted block mb-0.5">Service</span>
-                  <span className="font-semibold text-foreground">{parsedResult.service}</span>
+                  <span className="font-semibold text-foreground">{intent.service}</span>
                 </div>
                 <div>
                   <span className="text-text-muted block mb-0.5">Max Budget Cap</span>
-                  <span className="font-bold text-success">${parsedResult.maxUsd} USD</span>
+                  <span className="font-bold text-success">${intent.maxUsd} USD</span>
                 </div>
                 <div>
-                  <span className="text-text-muted block mb-0.5">Timeline</span>
-                  <span className="text-foreground">{parsedResult.window}</span>
+                  <span className="text-text-muted block mb-0.5">Location</span>
+                  <span className="text-foreground">{intent.city}</span>
                 </div>
                 <div>
                   <span className="text-text-muted block mb-0.5">Policy Gate</span>
@@ -169,51 +163,15 @@ export default function ConsumerDashboard() {
               </h2>
 
               <div className="space-y-3">
-                {parsedResult.providers.map((provider: any) => (
-                  <SolidCard 
-                    key={provider.id}
-                    variant={provider.recommended ? "glass" : "solid"}
-                    className={`p-5 rounded-lg transition-all ${provider.recommended ? 'border-white/30 bg-white/[0.06]' : 'opacity-80'}`}
-                  >
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-display font-bold text-base">{provider.name}</h3>
-                          {provider.recommended && (
-                            <span className="text-[10px] font-mono uppercase tracking-wider bg-white text-black px-2 py-0.5 rounded-sm font-semibold">
-                              AI Pick #1
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 mt-1.5 text-xs text-text-muted font-mono">
-                          <span className="text-success font-semibold">
-                            {provider.trustScore}% Trust Score
-                          </span>
-                          <span>({provider.jobs} Jobs Indexed on The Graph)</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
-                        <div className="text-right">
-                          <span className="text-[10px] font-mono text-text-muted block">Quoted Price</span>
-                          <span className="text-lg font-display font-bold">${provider.quote} USD</span>
-                        </div>
-
-                        <Link href="/intent/123">
-                          <PrimaryButton variant={provider.recommended ? "primary" : "secondary"} className="px-4 py-2 text-xs">
-                            Select & Lock Escrow
-                          </PrimaryButton>
-                        </Link>
-                      </div>
-                    </div>
-                  </SolidCard>
+                {intent.providers.map((provider) => (
+                  <QuoteCard key={provider.id} provider={provider} intentId={intent.id} />
                 ))}
               </div>
             </div>
 
             {/* Bottom CTA */}
             <div className="pt-2 flex justify-end">
-              <Link href="/intent/123">
+              <Link href={`/intent/${intent.id}`}>
                 <PrimaryButton variant="primary" className="px-6 py-3 text-xs flex items-center gap-2">
                   <span>Proceed to Quote & Escrow Hub</span>
                   <ArrowRight className="w-3.5 h-3.5" />
