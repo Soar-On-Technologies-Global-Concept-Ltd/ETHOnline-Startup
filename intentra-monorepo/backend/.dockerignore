@@ -1,0 +1,12 @@
+.git
+.venv
+venv
+__pycache__
+.pytest_cache
+.data
+node_modules
+subgraph/*/generated
+subgraph/*/build
+contracts/out
+contracts/cache
+*.md

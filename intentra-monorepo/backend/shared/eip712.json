@@ -1,0 +1,68 @@
+{
+  "domain": {
+    "name": "Intentra",
+    "version": "1",
+    "chainId": 5042002,
+    "verifyingContract": "<ESCROW_ADDRESS>"
+  },
+  "types": {
+    "EIP712Domain": [
+      {
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "name": "version",
+        "type": "string"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256"
+      },
+      {
+        "name": "verifyingContract",
+        "type": "address"
+      }
+    ],
+    "Authorization": [
+      {
+        "name": "txKey",
+        "type": "bytes32"
+      },
+      {
+        "name": "customer",
+        "type": "address"
+      },
+      {
+        "name": "provider",
+        "type": "address"
+      },
+      {
+        "name": "maxAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "scopeHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "expiresAt",
+        "type": "uint64"
+      }
+    ],
+    "Resolution": [
+      {
+        "name": "txKey",
+        "type": "bytes32"
+      },
+      {
+        "name": "providerBps",
+        "type": "uint16"
+      },
+      {
+        "name": "outcomeHash",
+        "type": "bytes32"
+      }
+    ]
+  }
+}

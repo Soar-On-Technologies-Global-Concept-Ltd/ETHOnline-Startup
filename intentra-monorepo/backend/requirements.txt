@@ -1,0 +1,33 @@
+# Runtime dependencies for the Intentra backend.
+#
+#   pip install -r requirements.txt
+#
+# This mirrors [project].dependencies in pyproject.toml, which stays the source of truth for `pip install .`
+# and for the Docker image. Keep the two in step. The version in each comment is what this backend was built
+# and verified against on 12 September 2026 (515 tests, both demo paths end to end).
+
+# --- API ------------------------------------------------------------------------------------------
+fastapi>=0.115                  # 0.141.1
+uvicorn[standard]>=0.30         # 0.52.4
+python-multipart>=0.0.12        # 0.0.32   multipart evidence uploads
+
+# --- Database -------------------------------------------------------------------------------------
+sqlmodel>=0.0.22                # 0.0.42
+sqlalchemy[asyncio]>=2.0.36     # 2.0.52
+asyncpg>=0.30                   # 0.31.0
+alembic>=1.14                   # 1.20.0
+
+# --- Settings and outbound HTTP ---------------------------------------------------------------------
+pydantic>=2.9                   # 2.13.5
+pydantic-settings>=2.6          # 2.15.0
+httpx>=0.27                     # 0.28.1   Privy, World and The Graph
+
+# --- Arc, EIP-712 and identity ------------------------------------------------------------------------
+web3>=8.0,<9                    # 8.0.0    the async contract and log APIs used here are 8.x only
+eth-account>=0.13               # 0.14.0   typed-data signing and recovery
+pyjwt[crypto]>=2.9              # 2.14.0   ES256 verification of Privy access tokens
+
+# --- AgentService and evidence ------------------------------------------------------------------------
+anthropic>=1.0,<2               # 1.5.0    messages.parse with structured output and server-side fallbacks
+pillow>=11.0                    # 12.3.0   EXIF stripping and format sniffing
+boto3>=1.35                     # 1.43.93  S3-compatible evidence storage (STORAGE_BACKEND=s3)

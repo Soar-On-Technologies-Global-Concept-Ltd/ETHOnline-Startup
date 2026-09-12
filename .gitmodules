@@ -1,0 +1,6 @@
+[submodule "intentra-monorepo/contracts/lib/forge-std"]
+	path = intentra-monorepo/contracts/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "intentra-monorepo/contracts/lib/openzeppelin-contracts"]
+	path = intentra-monorepo/contracts/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
