@@ -34,6 +34,15 @@ async def owned_by(s: AsyncSession, intent_id: uuid.UUID, customer_id: uuid.UUID
     return intent
 
 
+async def view(s: AsyncSession, intent_id: uuid.UUID, customer_id: uuid.UUID) -> dict:
+    """What POST /intents returned, read back. The transaction id matters most: every later call in the flow is
+    addressed by it, and a client that kept only the intent id has no other way to recover it."""
+    intent = await owned_by(s, intent_id, customer_id)
+    tx = await transactions.by_intent(s, intent.id)
+    return {"intent_id": str(intent.id), "transaction_id": str(tx.id), "status": intent.status,
+            "spec": intent.structured, "clarifying_question": intent.clarifying_question, "state": tx.state}
+
+
 async def get_quote(s: AsyncSession, quote_id: uuid.UUID | None) -> Quote | None:
     return None if quote_id is None else await s.get(Quote, quote_id)
 

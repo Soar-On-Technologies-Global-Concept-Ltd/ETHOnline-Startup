@@ -2,7 +2,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.core.config import Settings
+from app.core.config import Settings, normalise_database_url
 
 REAL_SECRET = "b8c1f0a4d93e47128f6a20bd5c7e9134"
 
@@ -61,3 +61,49 @@ def test_development_keeps_the_convenient_defaults():
     relaxed = settings(env="dev", signing_secret="dev-only-change-me", privy_mode="fake", world_mode="fake",
                        llm_provider="fake")
     assert relaxed.privy_mode == "fake" and relaxed.env == "dev"
+
+
+# --- the database URL a managed platform hands us -------------------------------------------------------------
+
+def test_render_internal_url_becomes_an_asyncpg_url():
+    """Render's own connection string names no driver, so SQLAlchemy would reach for psycopg2 and the image
+    would crash on boot with ModuleNotFoundError — a failure that never appears locally."""
+    url, tls = normalise_database_url("postgresql://intentra:pw@dpg-abc123-a:5432/intentra")
+    assert url == "postgresql+asyncpg://intentra:pw@dpg-abc123-a:5432/intentra"
+    assert tls is False
+
+
+def test_the_heroku_style_postgres_scheme_is_rewritten_too():
+    url, _ = normalise_database_url("postgres://u:p@host:5432/db")
+    assert url.startswith("postgresql+asyncpg://")
+
+
+def test_sslmode_becomes_a_connect_argument_rather_than_a_url_parameter():
+    """asyncpg raises TypeError on sslmode, so it has to leave the URL and come back as connect_args."""
+    url, tls = normalise_database_url(
+        "postgresql://u:p@host.oregon-postgres.render.com/db?sslmode=require")
+    assert "sslmode" not in url
+    assert tls is True
+
+
+def test_other_libpq_only_parameters_are_dropped():
+    url, _ = normalise_database_url("postgresql://u@h/db?channel_binding=require&target_session_attrs=rw")
+    assert "channel_binding" not in url and "target_session_attrs" not in url
+
+
+def test_ordinary_query_parameters_survive():
+    url, _ = normalise_database_url("postgresql://u@h/db?application_name=intentra&sslmode=disable")
+    assert "application_name=intentra" in url
+
+
+def test_a_url_that_is_already_correct_is_left_alone():
+    raw = "postgresql+asyncpg://intentra@127.0.0.1:5432/intentra"
+    url, tls = normalise_database_url(raw)
+    assert (url, tls) == (raw, False)
+
+
+def test_settings_normalise_on_construction(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@host/db?sslmode=verify-full")
+    s = Settings(_env_file=None)
+    assert s.database_url == "postgresql+asyncpg://u:p@host/db"
+    assert s.database_requires_tls is True

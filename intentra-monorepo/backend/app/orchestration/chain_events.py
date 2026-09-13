@@ -6,7 +6,7 @@ hash tells us which transaction it belongs to. Every later event is looked up by
 """
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -27,6 +27,9 @@ from app.integrations.arc.events import DecodedLog, decode
 
 logger = logging.getLogger("chain")
 CURSOR_KEY = "watcher_block"
+# How long a reported hash stays worth re-reading. Longer than any plausible time to be mined,
+# short enough that a transaction which emits no escrow log stops being retried.
+REPORTED_TX_WINDOW = timedelta(minutes=10)
 
 
 def _at(seconds: int) -> datetime:
@@ -247,9 +250,35 @@ async def poll_once() -> int:
     return len(logs)
 
 
+async def observe_reported() -> int:
+    """Read the receipts of hashes the wallet reported, rather than waiting for the sweep to reach their block.
+
+    The sweep is sequential, so after an idle restart it can be tens of thousands of blocks behind — and the
+    client that just funded a job is blocked on the `intentId` inside one of those receipts. This reads that
+    receipt directly, so binding costs one tick instead of a full catch-up. Nothing here is authoritative: the
+    sweep still handles the same logs later, and `handle_log` is keyed on (tx_hash, log_index), so it is a no-op.
+    """
+    async with session_scope() as s:
+        hashes = await payments.unobserved_reported_hashes(s, REPORTED_TX_WINDOW)
+    seen = 0
+    for tx_hash in hashes:
+        try:
+            await receipt_logs(tx_hash)
+            seen += 1
+        except Exception as err:
+            # Almost always "not mined yet". The next tick tries again until the window closes.
+            log(logger, "reported transaction not readable yet", tx_hash=tx_hash,
+                error=f"{type(err).__name__}: {err}")
+    return seen
+
+
 async def run(stop: asyncio.Event) -> None:
     interval = get_settings().watch_interval_seconds
     while not stop.is_set():
+        try:
+            await observe_reported()
+        except Exception as err:
+            log(logger, "reported transaction pass failed", error=f"{type(err).__name__}: {err}")
         try:
             await poll_once()
         except Exception as err:

@@ -1,0 +1,72 @@
+name: Keep Render Warm
+
+# Render's free tier spins a web service down after 15 idle minutes. The cold start that follows costs
+# about a minute, and during it the chain watcher is replaying the blocks it missed — measured at 24,496
+# blocks behind after one idle period. The backend now reads reported receipts directly, so funding no
+# longer races that catch-up, but the first request after idle is still slow and a demo should not open
+# on a spinner.
+#
+# A request every five minutes keeps the service from ever going idle. Five minutes is GitHub's minimum
+# cron interval, and scheduled runs are frequently delayed under load, so this leaves roughly 3x margin
+# against the 15-minute timeout.
+#
+# This is a mitigation, not a fix. The fix is an instance that does not sleep.
+# Note: GitHub disables scheduled workflows in a repository with no activity for 60 days.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keep-warm
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    name: Ping /healthz
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake the API and report what answered
+        env:
+          API: https://ethonline-startup-intentra.onrender.com
+        run: |
+          set -uo pipefail
+          body=""
+          for attempt in 1 2 3; do
+            # A cold start can take most of a minute, so be patient before calling the service down.
+            if body=$(curl -sS --max-time 90 "$API/healthz"); then
+              [ -n "$body" ] && break
+            fi
+            echo "attempt $attempt did not answer; retrying in 15s"
+            sleep 15
+          done
+
+          if [ -z "$body" ]; then
+            echo "::error::$API/healthz did not answer after 3 attempts"
+            exit 1
+          fi
+
+          version=$(printf '%s' "$body" | jq -r '.version // "?"' | cut -c1-8)
+          db=$(printf '%s' "$body" | jq -r '.db // "?"')
+          rpc=$(printf '%s' "$body" | jq -r '.rpc // "?"')
+          leader=$(printf '%s' "$body" | jq -r '.leader // "?"')
+          lag=$(printf '%s' "$body" | jq -r '.watcher_lag_blocks // -1')
+
+          line="awake | version $version | db $db | rpc $rpc | leader $leader | watcher lag $lag"
+          echo "$line"
+          echo "$line" >> "$GITHUB_STEP_SUMMARY"
+
+          # Down is worth an email. Lag is worth a warning: the watcher is still catching up, and a demo
+          # started right now could outrun it.
+          if [ "$db" != "ok" ] || [ "$rpc" != "ok" ]; then
+            echo "::error::unhealthy - db=$db rpc=$rpc"
+            exit 1
+          fi
+          if [ "$lag" -gt 500 ] 2>/dev/null; then
+            echo "::warning::watcher is $lag blocks behind; give it a moment before demoing"
+          fi

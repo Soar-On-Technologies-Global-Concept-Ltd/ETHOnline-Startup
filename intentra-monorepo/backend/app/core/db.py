@@ -13,7 +13,12 @@ _sessionmaker: async_sessionmaker[AsyncSession] | None = None
 def get_engine() -> AsyncEngine:
     global _engine, _sessionmaker
     if _engine is None:
-        _engine = create_async_engine(get_settings().database_url, pool_size=10, max_overflow=5, pool_pre_ping=True)
+        settings = get_settings()
+        # Managed Postgres reached from outside its own network wants TLS, and asyncpg takes that as a connect
+        # argument rather than a URL parameter — settings strips the libpq spelling and sets the flag.
+        connect_args = {"ssl": "require"} if settings.database_requires_tls else {}
+        _engine = create_async_engine(settings.database_url, pool_size=10, max_overflow=5, pool_pre_ping=True,
+                                      connect_args=connect_args)
         _sessionmaker = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
     return _engine
 

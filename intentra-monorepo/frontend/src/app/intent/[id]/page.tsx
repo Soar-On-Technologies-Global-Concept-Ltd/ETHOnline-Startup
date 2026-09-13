@@ -16,7 +16,7 @@ import { useIntentStore } from "@/store/intentStore";
 import { usePrivy, useSendTransaction } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { fetchIntentById, Intent } from "@/lib/api";
+import { fetchIntentById, Intent, API_BASE_URL } from "@/lib/api";
 
 interface DisputeResolutionData {
   rationale?: string;
@@ -51,15 +51,14 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
     async function loadIntent() {
       try {
         const token = await getAccessToken();
-        const headers = token ? { "Authorization": `Bearer ${token}` } : {};
-        const data = await fetchIntentById(intentId); // We assume fetchIntentById handles this or doesn't need auth, but wait, the API lib might need auth. If the user gets 401s here, we need to update the lib. Let's just wrap the internal fetch calls for now.
+        const data = await fetchIntentById(intentId, token ?? undefined);
         setIntent(data);
       } catch (e) {
         console.error(e);
       }
     }
     loadIntent();
-  }, [intentId]);
+  }, [intentId, getAccessToken]);
 
   // Save state to localStorage on change
   useEffect(() => {
@@ -73,9 +72,13 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
     }
   }, [intentId, role, step, evidenceHash, disputeResolution]);
 
+
+  // The URL carries the intent id, but the backend addresses transactions by their own id.
+  // fetchIntentById returns it; until the intent loads, fall back to the param.
+  const txId = intent?.transactionId ?? intentId;
+
   const handleSignMandateAndLock = async () => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
       const token = await getAccessToken();
       const headers = { 
         "Content-Type": "application/json",
@@ -84,79 +87,112 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
 
       toast.info("Requesting funding transactions...");
       
-      // 1. Get createIntent calls
-      let response = await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({}),
-      });
-      if (!response.ok) throw new Error("Failed to get create_intent calls");
-      let data = await response.json();
+      let data;
+      if (intentId.startsWith("intent_")) {
+        // Mock fallback for hackathon UI flow without a backend tx
+        await new Promise(r => setTimeout(r, 1500));
+        data = {
+          step: "create_intent",
+          calls: [{
+            to: "0x0000000000000000000000000000000000000000",
+            data: "0x",
+            value: "0"
+          }]
+        };
+      } else {
+        // 1. Get createIntent calls from backend
+        const response = await fetch(`${API_BASE_URL}/transactions/${txId}/fund`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({}),
+        });
+        if (!response.ok) throw new Error("Failed to get create_intent calls");
+        data = await response.json();
+      }
 
       if (data.step === "create_intent") {
         toast.info("Deploying intent to Arc Testnet... Please sign the transaction.");
         const createCall = data.calls[0];
         
-        const txHash = await sendTransaction({
-          to: createCall.to,
-          data: createCall.data,
-          value: createCall.value ? BigInt(createCall.value) : undefined
-        });
+        let txHash = { hash: "mock_tx_hash_create" };
+        if (!intentId.startsWith("intent_")) {
+          txHash = await sendTransaction({
+            to: createCall.to,
+            data: createCall.data,
+            value: createCall.value ? BigInt(createCall.value) : undefined
+          });
+          toast.info("Reporting intent creation to backend...");
+          await fetch(`${API_BASE_URL}/transactions/${txId}/fund`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ tx_hash: txHash.hash || txHash }),
+          });
 
-        toast.info("Reporting intent creation to backend...");
-        await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ tx_hash: txHash.hash || txHash }),
-        });
-
-        toast.info("Waiting for smart contract initialization (this may take a few seconds)...");
-        let intentBound = false;
-        for (let i = 0; i < 30; i++) {
-          await new Promise(r => setTimeout(r, 2000));
-          const txRes = await fetch(`${baseUrl}/transactions/${intentId}`, { headers });
-          if (txRes.ok) {
-            const txData = await txRes.json();
-            if (txData.escrow_intent_id != null) {
-              intentBound = true;
-              break;
+          toast.info("Waiting for smart contract initialization (this may take a few seconds)...");
+          let intentBound = false;
+          for (let i = 0; i < 30; i++) {
+            await new Promise(r => setTimeout(r, 2000));
+            const txRes = await fetch(`${API_BASE_URL}/transactions/${txId}`, { headers });
+            if (txRes.ok) {
+              const txData = await txRes.json();
+              if (txData.escrow_intent_id != null) {
+                intentBound = true;
+                break;
+              }
             }
           }
-        }
-        if (!intentBound) throw new Error("Timed out waiting for Arc intent to initialize");
+          if (!intentBound) throw new Error("Timed out waiting for Arc intent to initialize");
 
-        // Fetch fund calls now that intent is bound
-        response = await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({}),
-        });
-        if (!response.ok) throw new Error("Failed to get fund_intent calls");
-        data = await response.json();
+          // Fetch fund calls now that intent is bound
+          const response = await fetch(`${API_BASE_URL}/transactions/${txId}/fund`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({}),
+          });
+          if (!response.ok) throw new Error("Failed to get fund_intent calls");
+          data = await response.json();
+        } else {
+          // Mock bound
+          await new Promise(r => setTimeout(r, 2000));
+          data = {
+            step: "fund_intent",
+            calls: [
+              { to: "0x0000000000000000000000000000000000000000", data: "0x", value: "0" },
+              { to: "0x0000000000000000000000000000000000000000", data: "0x", value: "0" }
+            ]
+          };
+        }
       }
 
       if (data.step === "fund_intent") {
         toast.info("Approving USDC transfer... Please sign the transaction.");
         const approveCall = data.calls[0];
-        await sendTransaction({
-          to: approveCall.to,
-          data: approveCall.data,
-          value: approveCall.value ? BigInt(approveCall.value) : undefined
-        });
+        
+        if (!intentId.startsWith("intent_")) {
+          await sendTransaction({
+            to: approveCall.to,
+            data: approveCall.data,
+            value: approveCall.value ? BigInt(approveCall.value) : undefined
+          });
 
-        toast.info("Funding intent in escrow... Please sign the final transaction.");
-        const fundCall = data.calls[1];
-        const finalTxHash = await sendTransaction({
-          to: fundCall.to,
-          data: fundCall.data,
-          value: fundCall.value ? BigInt(fundCall.value) : undefined
-        });
+          toast.info("Funding intent in escrow... Please sign the final transaction.");
+          const fundCall = data.calls[1];
+          const finalTxHash = await sendTransaction({
+            to: fundCall.to,
+            data: fundCall.data,
+            value: fundCall.value ? BigInt(fundCall.value) : undefined
+          });
 
-        await fetch(`${baseUrl}/transactions/${intentId}/fund`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ tx_hash: finalTxHash.hash || finalTxHash }),
-        });
+          await fetch(`${API_BASE_URL}/transactions/${txId}/fund`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ tx_hash: finalTxHash.hash || finalTxHash }),
+          });
+        } else {
+          await new Promise(r => setTimeout(r, 1500));
+          toast.info("Funding intent in escrow... Please sign the final transaction.");
+          await new Promise(r => setTimeout(r, 1500));
+        }
       }
 
       setStep('paid');
@@ -179,47 +215,59 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
 
   const handleDisputeSubmitted = async (complaint: string) => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
       const token = await getAccessToken();
       const headers = { 
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}` 
       };
-      const response = await fetch(`${baseUrl}/transactions/${intentId}/complaint`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          category: "incomplete",
-          text: complaint,
-          evidence_ids: [],
-          idkit_result: { merkle_root: "mock", nullifier_hash: "mock", proof: "mock", verification_level: "orb" }
-        })
-      });
       
-      if (!response.ok) throw new Error("Backend failed to file dispute");
+      if (!intentId.startsWith("intent_")) {
+        const response = await fetch(`${API_BASE_URL}/transactions/${txId}/complaint`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            category: "incomplete",
+            text: complaint,
+            evidence_ids: [],
+            idkit_result: { merkle_root: "mock", nullifier_hash: "mock", proof: "mock", verification_level: "orb" }
+          })
+        });
+        if (!response.ok) throw new Error("Backend failed to file dispute");
+      }
       
       setStep('disputed');
       toast.info("Dispute opened! Waiting for AI L2 Arbitrator...");
       
       // Simulate polling by just fetching the transaction in a loop
       const pollInterval = setInterval(async () => {
-        const res = await fetch(`${baseUrl}/transactions/${intentId}`, { headers });
-        if (res.ok) {
-          const txData = await res.json();
-          if (txData.state === "resolved" || txData.state === "disputed") {
-            // For hackathon, if backend doesn't resolve instantly, we fallback to a mock resolution after a delay
-            // If the backend has a real resolution, parse it.
-            clearInterval(pollInterval);
-            setStep('disputed'); // keep it as disputed until user accepts
-            setDisputeResolution(txData.resolution || {
-              splitCustomer: 70,
-              splitProvider: 30,
-              customerUsd: Math.round((intent?.maxUsd || 150) * 0.7),
-              providerUsd: Math.round((intent?.maxUsd || 150) * 0.3),
-              rationale: `L2 Vision analysis of complaint "${complaint}" confirms partial delivery. Proposed 70/30 split based on anchored evidence.`
-            });
-            toast.warning("AI L2 Arbitrator generated resolution.");
+        let isResolved = false;
+        let txData = null;
+
+        if (intentId.startsWith("intent_")) {
+           isResolved = true; // immediately resolve for mock
+        } else {
+          const res = await fetch(`${API_BASE_URL}/transactions/${txId}`, { headers });
+          if (res.ok) {
+            txData = await res.json();
+            if (txData.state === "resolved" || txData.state === "disputed") {
+              isResolved = true;
+            }
           }
+        }
+
+        if (isResolved) {
+          // For hackathon, if backend doesn't resolve instantly, we fallback to a mock resolution after a delay
+          // If the backend has a real resolution, parse it.
+          clearInterval(pollInterval);
+          setStep('disputed'); // keep it as disputed until user accepts
+          setDisputeResolution(txData?.resolution || {
+            splitCustomer: 70,
+            splitProvider: 30,
+            customerUsd: Math.round((intent?.maxUsd || 150) * 0.7),
+            providerUsd: Math.round((intent?.maxUsd || 150) * 0.3),
+            rationale: `L2 Vision analysis of complaint "${complaint}" confirms partial delivery. Proposed 70/30 split based on anchored evidence.`
+          });
+          toast.warning("AI L2 Arbitrator generated resolution.");
         }
       }, 3000);
     } catch (err) {
@@ -230,20 +278,29 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
 
   const handleSignResolution = async () => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
       const token = await getAccessToken();
       const headers = { 
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}` 
       };
 
-      const req = await fetch(`${baseUrl}/transactions/${intentId}/release`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({}),
-      });
-      if (!req.ok) throw new Error("Failed to fetch resolution typed data from backend");
-      const { resolution_typed_data } = await req.json();
+      let resolution_typed_data = {
+        domain: { name: "ArcEscrow", version: "1" },
+        types: { Resolution: [{ name: "rationale", type: "string" }] },
+        primaryType: "Resolution",
+        message: { rationale: "mock_resolution" }
+      };
+
+      if (!intentId.startsWith("intent_")) {
+        const req = await fetch(`${API_BASE_URL}/transactions/${txId}/release`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({}),
+        });
+        if (!req.ok) throw new Error("Failed to fetch resolution typed data from backend");
+        const resData = await req.json();
+        resolution_typed_data = resData.resolution_typed_data;
+      }
 
       let sig;
       if (signTypedData) {
@@ -255,12 +312,16 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
           message: resolution_typed_data.message,
         });
         
-        const response = await fetch(`${baseUrl}/transactions/${intentId}/release`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ signature: sig }),
-        });
-        if (!response.ok) throw new Error("Backend rejected signature");
+        if (!intentId.startsWith("intent_")) {
+          const response = await fetch(`${API_BASE_URL}/transactions/${txId}/release`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ signature: sig }),
+          });
+          if (!response.ok) throw new Error("Backend rejected signature");
+        } else {
+          await new Promise(r => setTimeout(r, 1500));
+        }
       }
 
       setStep('resolved');
@@ -430,7 +491,7 @@ export default function IntentTransactionPage({ params }: { params: Promise<{ id
           )}
 
           {role === 'provider' && step === 'paid' && (
-            <EvidenceUploader intentId={intentId} onEvidenceSubmitted={handleEvidenceSubmitted} />
+            <EvidenceUploader transactionId={txId} onEvidenceSubmitted={handleEvidenceSubmitted} />
           )}
 
           {/* Step 3: Reusable DisputeResolver */}

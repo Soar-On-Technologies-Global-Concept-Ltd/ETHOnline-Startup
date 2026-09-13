@@ -167,7 +167,26 @@ The abuse cases are tests, not prose — `tests/test_security_db.py` over HTTP a
    never bids below the 20 gwei floor.
 4. `alembic upgrade head`, then run the API. Workers start only on the instance holding the Postgres advisory lock.
 
+### On Render
+
+`render.yaml` at the repository root is a blueprint for a free Postgres and a Docker web service: in Render,
+**New → Blueprint**, pick the repository, apply. By hand instead: a Web Service with Root Directory
+`intentra-monorepo/backend`, runtime Docker, health check `/healthz`, and the blueprint's environment variables.
+
+The container runs `scripts/start.sh`: migrate, optionally seed, then serve on `$PORT`. Four things the platform
+does that would otherwise break the boot are handled for you — its `postgresql://` URL is rewritten to `asyncpg`,
+an `?sslmode=require` becomes a TLS connect argument, `$PORT` is honoured, and `SEED_DEMO_DATA=true` populates the
+three demo painters, since the free plan gives you no shell to seed an empty database from.
+
+Pick `ENV` deliberately. `ENV=dev` keeps the HMAC-signed `POST /v1/webhooks/simulate` reachable, which is what
+lets a demo walk a funding and a dispute without a customer wallet broadcasting, and it permits the `fake` partner
+modes — so the service runs with no partner credentials at all. `ENV=staging` turns that route off and refuses
+every `fake`, so it needs real Privy, World and Anthropic keys before it will start.
+
+Two limits: free web services sleep after 15 idle minutes, which stops the chain watcher, and evidence stored with
+`STORAGE_BACKEND=local` is lost on every deploy — use `s3` to keep it.
+
 ## Notes for judges
 
 Partner facts (chain ID, addresses, decimals, API shapes) were verified on 11 September 2026 and cited in the
-schematics document; re-check before submission. Written with Claude Code (Claude Opus 5); the specs are in `docs/`.
+schematics document; re-check before submission. The specs are in `docs/`.

@@ -24,6 +24,9 @@ export default function LandingPage() {
           <span className="text-lg font-display font-bold tracking-tight text-foreground hidden sm:inline">Intentra</span>
         </div>
         <div className="flex items-center gap-4">
+           <button onClick={() => router.push("/docs")} className="text-xs font-mono text-text-muted hover:text-foreground transition-colors">
+             Docs
+           </button>
            {authenticated ? (
              <button onClick={() => router.push("/dashboard/consumer")} className="text-xs font-mono bg-white/5 hover:bg-white/10 px-4 py-2 rounded-md border border-white/10 transition-all text-text-muted hover:text-foreground">
                Dashboard
