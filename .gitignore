@@ -68,3 +68,8 @@ Thumbs.db
 .vscode/
 *.swp
 *~
+
+# --- Docs ---------------------------------------------------------------------------------------
+Intentra_Docs/
+Intentra_Product_Documentation/
+Intentra_Architecture_Docs/
