@@ -2,7 +2,7 @@
 the wallet reported, and reads back what the escrow actually did. State only ever commits on a confirmed event.
 """
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -147,6 +147,22 @@ async def report_chain_tx(s: AsyncSession, tx, user_id: uuid.UUID, direction: st
         await machine.note(s, tx, f"customer:{user_id}", "TX_REPORTED", {"direction": direction, "tx_hash": tx_hash})
     return 202, {"payment": {"status": "PENDING", "tx_hash": tx_hash, "explorer_url": arc_client.explorer_tx(tx_hash)},
                  "transaction": {"id": str(tx.id), "state": tx.state}}
+
+
+async def unobserved_reported_hashes(s: AsyncSession, within: timedelta, limit: int = 10) -> list[str]:
+    """Transaction hashes the wallet reported that no escrow log has reached us for yet.
+
+    `report_chain_tx` stores the hash as a hint "so the receipt can be fetched early"; this is what makes that
+    true. Bounded by age on purpose: a reported transaction that never emits an escrow log — a send that
+    reverted, or an ERC-20 approve — would otherwise be re-fetched on every watcher tick forever.
+    """
+    observed = select(BlockchainEvent.tx_hash)
+    rows = await s.exec(select(Payment.external_ref)
+                        .where(Payment.rail == "arc", Payment.status == "PENDING",
+                               Payment.created_at >= utcnow() - within,
+                               Payment.external_ref.not_in(observed))
+                        .order_by(Payment.created_at.desc()).limit(limit))
+    return [ref for ref in rows.all() if ref]
 
 
 async def has_release_queued(s: AsyncSession, transaction_id: uuid.UUID) -> bool:
