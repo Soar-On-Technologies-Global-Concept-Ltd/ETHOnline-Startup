@@ -16,7 +16,10 @@ router = APIRouter(tags=["health"])
 async def healthz() -> dict:
     from app.workers import runner
 
-    out = {"version": os.getenv("GIT_SHA", "dev"), "db": "down", "rpc": "down", "leader": runner.is_leader(),
+    # Which commit is actually serving. Render sets RENDER_GIT_COMMIT itself; without a marker like this you
+    # cannot tell a deployed fix from an undeployed one, which is exactly when you most want to know.
+    version = os.getenv("GIT_SHA") or os.getenv("RENDER_GIT_COMMIT") or "dev"
+    out = {"version": version, "db": "down", "rpc": "down", "leader": runner.is_leader(),
            "watcher_lag_blocks": None, "outbox": {}, "graph_lag_blocks": None}
     try:
         async with sessionmaker()() as s:
